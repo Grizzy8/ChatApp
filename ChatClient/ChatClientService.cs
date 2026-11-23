@@ -168,6 +168,15 @@ public sealed class ChatClientService : IDisposable
         return SendMessageAsync(new ChatMessage(MessageType.RemoveContact, Text: userId), cancellationToken);
     }
 
+    /// <summary>
+    /// Tam kullanıcı adı ya da ID ile hesap arar (kısmi eşleşme yok). Sonuç UserFound olarak MessageReceived'da iletilir.
+    /// </summary>
+    public Task<bool> FindUserAsync(string usernameOrId, CancellationToken cancellationToken = default)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(usernameOrId);
+        return SendMessageAsync(new ChatMessage(MessageType.FindUser, Text: usernameOrId.Trim()), cancellationToken);
+    }
+
     // ---- gruplar ----
 
     /// <summary>Grup kurar. Sonuç GroupList (başarı) ya da Error olarak MessageReceived'da iletilir.</summary>

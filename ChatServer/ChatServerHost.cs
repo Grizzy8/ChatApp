@@ -31,18 +31,21 @@ public sealed partial class ChatServerHost : IDisposable
     private readonly ContactRepository _contacts;
     private readonly MessageRepository _messages;
     private readonly GroupRepository _groups;
+    private readonly PresenceRepository _presence;
     private readonly AuthAttemptLimiter _authLimiter;
 
-    public ChatServerHost(UserRepository users, ContactRepository contacts, MessageRepository messages, GroupRepository groups, AuthAttemptLimiter? authLimiter = null)
+    public ChatServerHost(UserRepository users, ContactRepository contacts, MessageRepository messages, GroupRepository groups, PresenceRepository presence, AuthAttemptLimiter? authLimiter = null)
     {
         ArgumentNullException.ThrowIfNull(users);
         ArgumentNullException.ThrowIfNull(contacts);
         ArgumentNullException.ThrowIfNull(messages);
         ArgumentNullException.ThrowIfNull(groups);
+        ArgumentNullException.ThrowIfNull(presence);
         _users = users;
         _contacts = contacts;
         _messages = messages;
         _groups = groups;
+        _presence = presence;
         _authLimiter = authLimiter ?? new AuthAttemptLimiter();
 
         _router = new MessageRouter(_registry);
@@ -362,20 +365,22 @@ public sealed partial class ChatServerHost : IDisposable
                 return ErrorCode.AccountAlreadyOnline;
             }
 
+            IReadOnlyList<string> visibleOnline = await GetOnlineVisibleToAsync(user.Id, token).ConfigureAwait(false);
+
             using (var sendCts = CancellationTokenSource.CreateLinkedTokenSource(token))
             {
                 sendCts.CancelAfter(MessageRouter.DeliveryTimeout);
                 await session.SendAsync(
                     new ChatMessage(
                         MessageType.JoinAccepted, Sender: user.Username, UserId: user.Id,
-                        Timestamp: DateTime.Now, Users: _registry.GetUsernames()),
+                        Timestamp: DateTime.Now, Users: visibleOnline),
                     sendCts.Token).ConfigureAwait(false);
             }
 
             session.MarkActive();
 
             var joined = new ChatMessage(MessageType.UserJoined, Sender: user.Username, Timestamp: DateTime.Now);
-            await _router.BroadcastAsync(joined, token, excluded: session).ConfigureAwait(false);
+            await NotifyWatchersAsync(user.Id, joined, token).ConfigureAwait(false);
             return ErrorCode.None;
         }
         finally
@@ -406,7 +411,7 @@ public sealed partial class ChatServerHost : IDisposable
             }
 
             var left = new ChatMessage(MessageType.UserLeft, Sender: session.Username, Timestamp: DateTime.Now);
-            await _router.BroadcastAsync(left, token).ConfigureAwait(false);
+            await NotifyWatchersAsync(session.UserId!, left, token).ConfigureAwait(false);
         }
         catch (OperationCanceledException) when (token.IsCancellationRequested)
         {
@@ -448,7 +453,7 @@ public sealed partial class ChatServerHost : IDisposable
 
     private async Task HandleMessageAsync(ClientSession session, ChatMessage message, CancellationToken token)
     {
-        if ((message.Type is MessageType.Chat or MessageType.Private or MessageType.AddContact or MessageType.RemoveContact || IsGroupRequest(message.Type))
+        if ((message.Type is MessageType.Private or MessageType.AddContact or MessageType.RemoveContact or MessageType.FindUser || IsGroupRequest(message.Type))
             && !session.RateLimiter.TryAcquire())
         {
             await RejectMessageAsync(session, ErrorCode.RateLimited, token).ConfigureAwait(false);
@@ -457,11 +462,11 @@ public sealed partial class ChatServerHost : IDisposable
 
         switch (message.Type)
         {
-            case MessageType.Chat:
-                await HandleChatAsync(session, message, token).ConfigureAwait(false);
-                break;
             case MessageType.Private:
                 await HandlePrivateAsync(session, message, token).ConfigureAwait(false);
+                break;
+            case MessageType.FindUser:
+                await HandleFindUserAsync(session, message, token).ConfigureAwait(false);
                 break;
             case MessageType.AddContact or MessageType.RemoveContact:
                 await HandleContactRequestAsync(session, message, token).ConfigureAwait(false);
@@ -473,22 +478,6 @@ public sealed partial class ChatServerHost : IDisposable
                 WriteLog($"{session.Username} geçersiz mesaj türü gönderdi ({message.Type}), yok sayıldı.", ServerLogLevel.Error);
                 break;
         }
-    }
-
-    /// <summary>Genel sohbet mesajını doğrular ve herkese iletir. Gönderen adı istemciden değil, oturumdan alınır.</summary>
-    private async Task HandleChatAsync(ClientSession session, ChatMessage message, CancellationToken token)
-    {
-        ErrorCode problem = ValidateMessageText(message.Text);
-        if (problem != ErrorCode.None)
-        {
-            await RejectMessageAsync(session, problem, token).ConfigureAwait(false);
-            return;
-        }
-
-        WriteLog($"{session.Username}: {message.Text}");
-
-        var broadcast = new ChatMessage(MessageType.Chat, Sender: session.Username, Text: message.Text, Timestamp: DateTime.Now);
-        await _router.BroadcastAsync(broadcast, token).ConfigureAwait(false);
     }
 
     private static ErrorCode ValidateMessageText(string? text)

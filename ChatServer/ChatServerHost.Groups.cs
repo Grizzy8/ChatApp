@@ -314,6 +314,7 @@ public sealed partial class ChatServerHost
             if (former is not null && _registry.TryGetActive(former.Username, out ClientSession? formerSession))
             {
                 await SendGroupListAsync(formerSession, token).ConfigureAwait(false);
+                await SendPresenceListAsync(formerSession, token).ConfigureAwait(false);
             }
         }
 
@@ -326,6 +327,7 @@ public sealed partial class ChatServerHost
             {
                 await SendGroupListAsync(target, token).ConfigureAwait(false);
                 await _router.SendToAsync(target, membersMessage, token).ConfigureAwait(false);
+                await SendPresenceListAsync(target, token).ConfigureAwait(false); // ortak grup üyeleri değişti
             }
         }
     }

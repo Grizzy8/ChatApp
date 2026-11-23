@@ -26,6 +26,7 @@ public sealed partial class ChatServerHost
             }
 
             await SendContactListAsync(session, token).ConfigureAwait(false);
+            await SendPresenceListAsync(session, token).ConfigureAwait(false); // kişi listesi değişti: görülebilen durumlar da değişti
         }
         catch (SqliteException ex)
         {

@@ -39,10 +39,22 @@ public enum MessageType
     /// </summary>
     PrivateQueued,
 
-    /// <summary>Sunucu → herkes: yeni bir kullanıcı katıldı.</summary>
+    /// <summary>İstemci → Sunucu: kullanıcı ara. Text = tam kullanıcı adı ya da ID (kısmi eşleşme aranmaz). Yanıt UserFound.</summary>
+    FindUser,
+
+    /// <summary>Sunucu → İstemci: FindUser sonucu. Contacts = bulunan tek hesap; bulunamadıysa ya da kendisiyse boş liste. Text = aranan metin.</summary>
+    UserFound,
+
+    /// <summary>
+    /// Sunucu → İstemci: çevrimiçi durumu görülebilen kullanıcıların (kişilerim ve ortak grup üyeleri) şu anki çevrimiçi listesi (Users).
+    /// Kişi ya da grup üyeliği değişince yeniden gönderilir.
+    /// </summary>
+    PresenceList,
+
+    /// <summary>Sunucu → çevrimiçi durumunu görebilen kullanıcılar (ona kişi ekleyenler ve ortak grup üyeleri): bir kullanıcı çevrimiçi oldu.</summary>
     UserJoined,
 
-    /// <summary>Sunucu → herkes: bir kullanıcı ayrıldı.</summary>
+    /// <summary>Sunucu → çevrimiçi durumunu görebilen kullanıcılar: bir kullanıcı çevrimdışı oldu.</summary>
     UserLeft,
 
     /// <summary>İstemci → Sunucu: kullanıcı bağlantıyı kendi isteğiyle kesiyor.</summary>

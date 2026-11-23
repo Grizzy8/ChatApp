@@ -20,7 +20,7 @@ namespace ChatServer
             InitializeComponent();
             var users = new UserRepository(_database);
             _messages = new MessageRepository(_database);
-            _host = new ChatServerHost(users, new ContactRepository(_database, users), _messages, new GroupRepository(_database));
+            _host = new ChatServerHost(users, new ContactRepository(_database, users), _messages, new GroupRepository(_database), new PresenceRepository(_database));
 
             portUpDown.Minimum = ProtocolConstants.MinPort;
             portUpDown.Maximum = ProtocolConstants.MaxPort;
