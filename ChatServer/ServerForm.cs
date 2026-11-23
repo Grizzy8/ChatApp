@@ -13,12 +13,14 @@ namespace ChatServer
 
         private readonly ChatDatabase _database = new(ChatDatabase.DefaultPath);
         private readonly ChatServerHost _host;
+        private readonly MessageRepository _messages;
 
         public ServerForm()
         {
             InitializeComponent();
             var users = new UserRepository(_database);
-            _host = new ChatServerHost(users, new ContactRepository(_database, users));
+            _messages = new MessageRepository(_database);
+            _host = new ChatServerHost(users, new ContactRepository(_database, users), _messages);
 
             portUpDown.Minimum = ProtocolConstants.MinPort;
             portUpDown.Maximum = ProtocolConstants.MaxPort;
@@ -43,6 +45,7 @@ namespace ChatServer
             {
                 // Şema güncel değilse hesap verisi okunamaz; sunucu dinlemeye başlamadan hazırlanır.
                 await _database.InitializeAsync();
+                await _messages.PurgeExpiredAsync(); // süresi dolan bekleyen mesajlar
                 _host.Start(port);
                 UpdateUiState(isRunning: true);
             }

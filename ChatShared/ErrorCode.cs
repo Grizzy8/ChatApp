@@ -36,5 +36,8 @@ public enum ErrorCode
 
     CannotAddSelf,
 
-    ContactLimitReached
+    ContactLimitReached,
+
+    /// <summary>Alıcının bekleyen mesaj kutusu dolu; çevrimdışı alıcıya yeni mesaj bırakılamaz.</summary>
+    RecipientInboxFull
 }

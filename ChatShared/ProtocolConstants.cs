@@ -25,6 +25,12 @@ public static class ProtocolConstants
     /// <summary>Bir kullanıcının kişi listesinde tutabileceği en fazla kişi.</summary>
     public const int MaxContacts = 200;
 
+    /// <summary>Çevrimdışı bir alıcı için sunucuda bekleyebilecek en fazla mesaj sayısı.</summary>
+    public const int MaxPendingMessagesPerRecipient = 500;
+
+    /// <summary>Teslim edilmeyen mesajların sunucuda saklanma süresi; sonra silinir.</summary>
+    public static readonly TimeSpan PendingMessageRetention = TimeSpan.FromDays(30);
+
     /// <summary>Kişi eklerken yazılan kullanıcı adı/ID metninin en fazla uzunluğu.</summary>
     public const int MaxContactQueryLength = 40;
 

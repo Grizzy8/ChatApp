@@ -135,24 +135,44 @@ namespace ChatClient
             }
         }
 
-        private string? SelectedRecipient => onlineListBox.SelectedItem as string;
+        // Seçilen alıcı: çevrimiçi listesinden ya da kişilerden (çift tık) gelir; çevrimdışı olsa da geçerlidir,
+        // çünkü mesaj sunucuda bekletilip alıcı girince teslim edilir. "Herkese dön" ile temizlenir.
+        private string? _chosenRecipient;
+        private bool _isSyncingRecipient; // kodla yapılan liste değişiklikleri alıcıyı silmesin
+
+        private string? SelectedRecipient => _chosenRecipient;
+
+        private void SetRecipient(string? username)
+        {
+            _chosenRecipient = username;
+            UpdateRecipientUi();
+        }
 
         private void ClearRecipientButton_Click(object? sender, EventArgs e)
         {
-            onlineListBox.ClearSelected();
+            _isSyncingRecipient = true;
+            try { onlineListBox.ClearSelected(); } finally { _isSyncingRecipient = false; }
+            SetRecipient(null);
             messageTextBox.Focus();
         }
 
         private void OnlineListBox_SelectedIndexChanged(object? sender, EventArgs e)
         {
+            if (_isSyncingRecipient)
+            {
+                return;
+            }
+
+            string? selected = onlineListBox.SelectedItem as string;
+
             // Kendine özel mesaj anlamsızdır: kendi adını seçmek seçimi kaldırır.
-            if (UsernameValidator.Comparer.Equals(SelectedRecipient, _client.Username))
+            if (UsernameValidator.Comparer.Equals(selected, _client.Username))
             {
                 onlineListBox.ClearSelected();
                 return;
             }
 
-            UpdateRecipientUi();
+            SetRecipient(selected);
         }
 
         private void UpdateRecipientUi()
@@ -160,7 +180,8 @@ namespace ChatClient
             string? recipient = SelectedRecipient;
             bool isPrivate = recipient is not null;
 
-            recipientLabel.Text = isPrivate ? $"→ {recipient} (özel mesaj)" : "Herkese";
+            bool isOnline = isPrivate && FindOnlineUserIndex(recipient!) >= 0;
+            recipientLabel.Text = isPrivate ? (isOnline ? $"→ {recipient} (özel mesaj)" : $"→ {recipient} (çevrimdışı — mesaj bekletilir)") : "Herkese";
             recipientLabel.ForeColor = isPrivate ? ClientConstants.PrivateMessageColor : SystemColors.GrayText;
             clearRecipientButton.Visible = isPrivate;
         }
@@ -207,15 +228,12 @@ namespace ChatClient
                     RemoveOnlineUser(message.Sender);
                     _chatView.AppendLine(message.Timestamp ?? DateTime.Now, $"{message.Sender} sohbetten ayrıldı.", ClientConstants.SystemMessageColor);
                     break;
+                case MessageType.PrivateQueued:
+                    ShowPrivate(message);
+                    _chatView.AppendSystem($"{message.Recipient} çevrimdışı; mesajınız, giriş yaptığında ona iletilecek.");
+                    break;
                 case MessageType.Private:
-                    DateTime privateTime = message.Timestamp ?? DateTime.Now;
-                    string privateSender = message.Sender ?? "?";
-                    string privateRecipient = message.Recipient ?? "?";
-                    string privateText = message.Text ?? string.Empty;
-                    bool isSentByMe = UsernameValidator.Comparer.Equals(message.Sender, _client.Username);
-                    _chatView.AppendPrivate(privateTime, privateSender, privateRecipient, privateText, isSentByMe);
-                    _ = SaveToHistoryAsync(
-                        privateTime, ChatHistoryStore.FormatPrivate(privateTime, privateSender, privateRecipient, privateText, isSentByMe));
+                    ShowPrivate(message);
                     break;
                 case MessageType.Chat:
                     DateTime chatTime = message.Timestamp ?? DateTime.Now;
@@ -234,8 +252,20 @@ namespace ChatClient
             }
         }
 
+        private void ShowPrivate(ChatMessage message)
+        {
+            DateTime time = message.Timestamp ?? DateTime.Now;
+            string sender = message.Sender ?? "?";
+            string recipient = message.Recipient ?? "?";
+            string text = message.Text ?? string.Empty;
+            bool isSentByMe = UsernameValidator.Comparer.Equals(message.Sender, _client.Username);
+            _chatView.AppendPrivate(time, sender, recipient, text, isSentByMe);
+            _ = SaveToHistoryAsync(time, ChatHistoryStore.FormatPrivate(time, sender, recipient, text, isSentByMe));
+        }
+
         private void SetOnlineUsers(IEnumerable<string> users)
         {
+            _isSyncingRecipient = true;
             onlineListBox.BeginUpdate();
             onlineListBox.Items.Clear();
             foreach (string user in users)
@@ -243,6 +273,7 @@ namespace ChatClient
                 onlineListBox.Items.Add(user);
             }
             onlineListBox.EndUpdate();
+            _isSyncingRecipient = false;
             UpdateOnlineCount();
             UpdateRecipientUi();
         }
@@ -253,6 +284,7 @@ namespace ChatClient
             {
                 onlineListBox.Items.Add(username);
                 UpdateOnlineCount();
+                UpdateRecipientUi(); // seçili alıcı çevrimiçi olduysa etiket güncellensin
             }
         }
 
@@ -261,7 +293,8 @@ namespace ChatClient
             int index = FindOnlineUserIndex(username);
             if (index >= 0)
             {
-                onlineListBox.Items.RemoveAt(index);
+                _isSyncingRecipient = true; // alıcı çevrimdışı olsa da seçili kalır; mesaj bekletilir
+                try { onlineListBox.Items.RemoveAt(index); } finally { _isSyncingRecipient = false; }
                 UpdateOnlineCount();
                 UpdateRecipientUi();
             }
@@ -293,6 +326,7 @@ namespace ChatClient
                 return;
             }
 
+            _chosenRecipient = null;
             SetOnlineUsers(Array.Empty<string>());
             ClearContacts();
             _history = null;

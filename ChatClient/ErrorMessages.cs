@@ -12,7 +12,8 @@ public static class ErrorMessages
         ErrorCode.UsernameInvalid =>
             $"Kullanıcı adı {ProtocolConstants.UsernameMinLength}-{ProtocolConstants.UsernameMaxLength} karakter olmalı; " +
             "yalnızca harf, rakam ve _ içerebilir.",
-        ErrorCode.RecipientNotFound => "Alıcı şu anda çevrimiçi değil.",
+        ErrorCode.RecipientNotFound => "Bu kullanıcı adı ya da ID ile bir hesap bulunamadı.",
+        ErrorCode.RecipientInboxFull => "Alıcının bekleyen mesaj kutusu dolu; şu an ona yeni mesaj bırakılamıyor.",
         ErrorCode.MessageTooLong => $"Mesaj en fazla {ProtocolConstants.MaxMessageLength} karakter olabilir.",
         ErrorCode.InvalidMessage => "Sunucu gönderilen mesajı anlayamadı.",
         ErrorCode.NotJoined => "Sohbete katılmadan işlem yapılamaz.",

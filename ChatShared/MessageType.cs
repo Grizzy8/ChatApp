@@ -33,6 +33,12 @@ public enum MessageType
     /// <summary>Özel mesaj (istemci → sunucu → alıcı ve gönderen).</summary>
     Private,
 
+    /// <summary>
+    /// Sunucu → gönderen: alıcı çevrimdışıydı, özel mesaj sunucuda bekletiliyor (alanlar Private ile aynı).
+    /// Alıcı bir sonraki girişinde mesajı normal Private olarak alır.
+    /// </summary>
+    PrivateQueued,
+
     /// <summary>Sunucu → herkes: yeni bir kullanıcı katıldı.</summary>
     UserJoined,
 

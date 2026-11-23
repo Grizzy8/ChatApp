@@ -29,6 +29,16 @@ public class MessageSerializerTests
     }
 
     [Fact]
+    public void RoundTrip_PrivateQueuedAndInboxFullError()
+    {
+        var queued = new ChatMessage(MessageType.PrivateQueued, Sender: "Ali", Recipient: "Bea", Text: "selam");
+        var error = new ChatMessage(MessageType.Error, ErrorCode: ErrorCode.RecipientInboxFull);
+
+        Assert.Equal(queued, MessageSerializer.Deserialize(MessageSerializer.Serialize(queued)));
+        Assert.Equal(error, MessageSerializer.Deserialize(MessageSerializer.Serialize(error)));
+    }
+
+    [Fact]
     public void RoundTrip_PreservesTurkishCharacters()
     {
         var original = new ChatMessage(MessageType.Chat, Sender: "Ayşe", Text: "Günaydın, çay İster misin? ğüşıöç");

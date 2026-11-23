@@ -147,22 +147,33 @@ namespace ChatClient
             removeContactButton.Enabled = _client.State == ConnectionState.Connected && contactsListBox.SelectedItem is not null;
         }
 
-        // Çift tıklama: kişi çevrimiçiyse "Çevrimiçi" sekmesinde alıcı olarak seçilir, böylece özel mesaj yazılabilir.
+        // Çift tıklama: kişi alıcı olarak seçilir. Çevrimdışıysa da seçilir; mesaj sunucuda bekletilip kişi girince iletilir.
         private void ContactsListBox_DoubleClick(object? sender, EventArgs e)
         {
-            if (contactsListBox.SelectedItem is not ContactListItem { IsOnline: true } item)
+            if (contactsListBox.SelectedItem is not ContactListItem item)
             {
                 return;
             }
 
             int index = FindOnlineUserIndex(item.Contact.Username);
-            if (index < 0)
+            _isSyncingRecipient = true;
+            try
             {
-                return;
+                if (index >= 0)
+                {
+                    onlineListBox.SelectedIndex = index;
+                }
+                else
+                {
+                    onlineListBox.ClearSelected();
+                }
+            }
+            finally
+            {
+                _isSyncingRecipient = false;
             }
 
-            sideTabs.SelectedTab = onlineTab;
-            onlineListBox.SelectedIndex = index;
+            SetRecipient(item.Contact.Username);
             messageTextBox.Focus();
         }
 

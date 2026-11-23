@@ -29,14 +29,17 @@ public sealed partial class ChatServerHost : IDisposable
 
     private readonly UserRepository _users;
     private readonly ContactRepository _contacts;
+    private readonly MessageRepository _messages;
     private readonly AuthAttemptLimiter _authLimiter;
 
-    public ChatServerHost(UserRepository users, ContactRepository contacts, AuthAttemptLimiter? authLimiter = null)
+    public ChatServerHost(UserRepository users, ContactRepository contacts, MessageRepository messages, AuthAttemptLimiter? authLimiter = null)
     {
         ArgumentNullException.ThrowIfNull(users);
         ArgumentNullException.ThrowIfNull(contacts);
+        ArgumentNullException.ThrowIfNull(messages);
         _users = users;
         _contacts = contacts;
+        _messages = messages;
         _authLimiter = authLimiter ?? new AuthAttemptLimiter();
 
         _router = new MessageRouter(_registry);
@@ -293,6 +296,7 @@ public sealed partial class ChatServerHost : IDisposable
 
         // Kişi listesi girişten hemen sonra, JoinAccepted'ın ardından gönderilir.
         await SendContactListAsync(session, token).ConfigureAwait(false);
+        await DeliverPendingMessagesAsync(session, token).ConfigureAwait(false);
         return true;
     }
 
@@ -477,46 +481,6 @@ public sealed partial class ChatServerHost : IDisposable
 
         var broadcast = new ChatMessage(MessageType.Chat, Sender: session.Username, Text: message.Text, Timestamp: DateTime.Now);
         await _router.BroadcastAsync(broadcast, token).ConfigureAwait(false);
-    }
-
-    /// <summary>
-    /// Özel mesajı yalnızca alıcıya ve göndericiye iletir. İçerik, gizlilik için sunucu log'una yazılmaz.
-    /// </summary>
-    private async Task HandlePrivateAsync(ClientSession session, ChatMessage message, CancellationToken token)
-    {
-        ErrorCode problem = ValidateMessageText(message.Text);
-        if (problem == ErrorCode.None
-            && (string.IsNullOrWhiteSpace(message.Recipient)
-                || UsernameValidator.Comparer.Equals(message.Recipient, session.Username)))
-        {
-            problem = ErrorCode.InvalidMessage; // alıcı yok ya da kişi kendine yazıyor
-        }
-
-        if (problem != ErrorCode.None)
-        {
-            await RejectMessageAsync(session, problem, token).ConfigureAwait(false);
-            return;
-        }
-
-        if (!_registry.TryGetActive(message.Recipient!, out ClientSession? target))
-        {
-            await RejectMessageAsync(session, ErrorCode.RecipientNotFound, token).ConfigureAwait(false);
-            return;
-        }
-
-        WriteLog($"{session.Username} → {target.Username}: [özel mesaj]");
-
-        var delivery = new ChatMessage(
-            MessageType.Private, Sender: session.Username, Recipient: target.Username, Text: message.Text, Timestamp: DateTime.Now);
-
-        if (!await _router.SendToAsync(target, delivery, token).ConfigureAwait(false))
-        {
-            await RejectMessageAsync(session, ErrorCode.RecipientNotFound, token).ConfigureAwait(false);
-            return;
-        }
-
-        // Gönderen de aynı kopyayı alır: mesajın iletildiğini ve sunucu saatini görür.
-        await _router.SendToAsync(session, delivery, token).ConfigureAwait(false);
     }
 
     private static ErrorCode ValidateMessageText(string? text)
