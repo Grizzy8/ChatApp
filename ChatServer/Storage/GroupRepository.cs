@@ -248,8 +248,7 @@ public sealed class GroupRepository
                 return GroupResult.NotAuthorized;
             }
 
-            await ExecuteAsync(connection, tx, "DELETE FROM GroupMembers WHERE GroupId = $g AND UserId = $u;",
-                ct, ("$g", groupId), ("$u", targetId)).ConfigureAwait(false);
+            await DeleteMembershipAsync(connection, tx, groupId, targetId, ct).ConfigureAwait(false);
             return GroupResult.Ok;
         }, ct);
 
@@ -268,8 +267,7 @@ public sealed class GroupRepository
                 return GroupResult.OwnerCannotLeave;
             }
 
-            await ExecuteAsync(connection, tx, "DELETE FROM GroupMembers WHERE GroupId = $g AND UserId = $u;",
-                ct, ("$g", groupId), ("$u", userId)).ConfigureAwait(false);
+            await DeleteMembershipAsync(connection, tx, groupId, userId, ct).ConfigureAwait(false);
             return GroupResult.Ok;
         }, ct);
 
@@ -354,6 +352,15 @@ public sealed class GroupRepository
         }, ct);
 
     // ---- yardımcılar ----
+
+    /// <summary>Üyeliği siler ve o üyeye bekleyen grup mesajlarını da siler: çıkarılan kişi sonradan mesaj okuyamaz.</summary>
+    private static async Task DeleteMembershipAsync(SqliteConnection connection, SqliteTransaction tx, string groupId, string userId, CancellationToken ct)
+    {
+        await ExecuteAsync(connection, tx, "DELETE FROM GroupMembers WHERE GroupId = $g AND UserId = $u;",
+            ct, ("$g", groupId), ("$u", userId)).ConfigureAwait(false);
+        await ExecuteAsync(connection, tx, "DELETE FROM PendingMessages WHERE GroupId = $g AND RecipientId = $u;",
+            ct, ("$g", groupId), ("$u", userId)).ConfigureAwait(false);
+    }
 
     private async Task<IReadOnlyList<GroupMemberRecord>> ReadMembersAsync(string groupId, CancellationToken ct)
     {

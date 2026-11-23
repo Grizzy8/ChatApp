@@ -5,7 +5,8 @@ using Microsoft.Data.Sqlite;
 namespace ChatServer.Storage;
 
 /// <summary>Çevrimdışı alıcıya bırakılan, henüz teslim edilmemiş özel mesaj.</summary>
-public sealed record PendingMessage(long Id, string SenderUsername, string Text, DateTime SentAtUtc);
+/// <summary>GroupId doluysa bu bir grup mesajıdır, boşsa özel mesajdır.</summary>
+public sealed record PendingMessage(long Id, string SenderUsername, string Text, DateTime SentAtUtc, string? GroupId = null);
 
 /// <summary>
 /// Teslim bekleyen özel mesajların kuyruğu. Teslim edilen mesaj silinir; sunucu sohbet geçmişi tutmaz.
@@ -63,6 +64,59 @@ public sealed class MessageRepository
         return true;
     }
 
+    /// <summary>
+    /// Grup mesajını, verilen çevrimdışı üyelerin her biri için ayrı bir kayıt olarak kuyruğa alır (tek işlemde).
+    /// Kutusu dolu olan üye atlanır; mesajın geri kalan üyelere gitmesi engellenmez. Kuyruğa alınan üye sayısını döner.
+    /// </summary>
+    public async Task<int> EnqueueGroupAsync(
+        string senderId, string groupId, IReadOnlyList<string> recipientIds, string text, DateTime sentAtUtc,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentException.ThrowIfNullOrEmpty(senderId);
+        ArgumentException.ThrowIfNullOrEmpty(groupId);
+        ArgumentException.ThrowIfNullOrEmpty(text);
+
+        if (recipientIds.Count == 0)
+        {
+            return 0;
+        }
+
+        await using SqliteConnection connection = await _database.OpenAsync(cancellationToken).ConfigureAwait(false);
+        await using SqliteTransaction transaction = connection.BeginTransaction(deferred: false);
+
+        int queued = 0;
+        foreach (string recipientId in recipientIds)
+        {
+            await using (SqliteCommand count = connection.CreateCommand())
+            {
+                count.Transaction = transaction;
+                count.CommandText = "SELECT COUNT(*) FROM PendingMessages WHERE RecipientId = $recipient;";
+                count.Parameters.AddWithValue("$recipient", recipientId);
+                long pending = Convert.ToInt64(await count.ExecuteScalarAsync(cancellationToken).ConfigureAwait(false));
+                if (pending >= ProtocolConstants.MaxPendingMessagesPerRecipient)
+                {
+                    continue;
+                }
+            }
+
+            await using SqliteCommand insert = connection.CreateCommand();
+            insert.Transaction = transaction;
+            insert.CommandText =
+                "INSERT INTO PendingMessages (RecipientId, SenderId, Payload, SentAt, GroupId) " +
+                "VALUES ($recipient, $sender, $payload, $sentAt, $group);";
+            insert.Parameters.AddWithValue("$recipient", recipientId);
+            insert.Parameters.AddWithValue("$sender", senderId);
+            insert.Parameters.AddWithValue("$payload", text);
+            insert.Parameters.AddWithValue("$sentAt", FormatTime(sentAtUtc));
+            insert.Parameters.AddWithValue("$group", groupId);
+            await insert.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
+            queued++;
+        }
+
+        await transaction.CommitAsync(cancellationToken).ConfigureAwait(false);
+        return queued;
+    }
+
     /// <summary>Alıcının bekleyen mesajlarını gönderim sırasıyla döner. Önce süresi dolanlar silinir.</summary>
     public async Task<IReadOnlyList<PendingMessage>> ListPendingAsync(string recipientId, CancellationToken cancellationToken = default)
     {
@@ -73,7 +127,7 @@ public sealed class MessageRepository
         await using SqliteConnection connection = await _database.OpenAsync(cancellationToken).ConfigureAwait(false);
         await using SqliteCommand command = connection.CreateCommand();
         command.CommandText =
-            "SELECT m.Id, u.Username, m.Payload, m.SentAt FROM PendingMessages m JOIN Users u ON u.Id = m.SenderId " +
+            "SELECT m.Id, u.Username, m.Payload, m.SentAt, m.GroupId FROM PendingMessages m JOIN Users u ON u.Id = m.SenderId " +
             "WHERE m.RecipientId = $recipient ORDER BY m.Id;";
         command.Parameters.AddWithValue("$recipient", recipientId);
 
@@ -85,7 +139,8 @@ public sealed class MessageRepository
                 reader.GetInt64(0),
                 reader.GetString(1),
                 reader.GetString(2),
-                DateTime.Parse(reader.GetString(3), CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind).ToUniversalTime()));
+                DateTime.Parse(reader.GetString(3), CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind).ToUniversalTime(),
+                reader.IsDBNull(4) ? null : reader.GetString(4)));
         }
 
         return messages;

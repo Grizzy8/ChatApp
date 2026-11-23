@@ -91,10 +91,11 @@ public sealed partial class ChatServerHost
 
             foreach (PendingMessage item in pending)
             {
+                // Grup mesajında Recipient grup kimliğidir (istemci adı kendi grup listesinden bulur); özel mesajda kullanıcının adıdır.
                 var message = new ChatMessage(
-                    MessageType.Private,
+                    item.GroupId is null ? MessageType.Private : MessageType.GroupMessage,
                     Sender: item.SenderUsername,
-                    Recipient: session.Username,
+                    Recipient: item.GroupId ?? session.Username,
                     Text: item.Text,
                     Timestamp: item.SentAtUtc.ToLocalTime());
 

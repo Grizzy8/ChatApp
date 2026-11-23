@@ -7,7 +7,7 @@ namespace ChatServer;
 // Gruplar: kurma, davet, kabul/red, üye yönetimi, roller ve grup mesajı.
 // Yetki ve sınır denetimleri GroupRepository içinde, değişiklikle aynı işlemde yapılır; burası yalnızca
 // girdiyi doğrular, sonucu hata koduna çevirir ve ilgili çevrimiçi kullanıcılara güncel durumu gönderir.
-// Grup mesajlarının içeriği log'a yazılmaz; sunucu çevrimdışı üyeler için grup mesajı saklamaz.
+// Grup mesajlarının içeriği log'a yazılmaz. Çevrimdışı üyeler için mesaj üye başına kuyruğa alınır ve girişte teslim edilip silinir.
 public sealed partial class ChatServerHost
 {
     private static bool IsGroupRequest(MessageType type) => type is
@@ -245,14 +245,23 @@ public sealed partial class ChatServerHost
         WriteLog($"{session.Username} → grup {groupId}: [grup mesajı]");
 
         var delivery = new ChatMessage(MessageType.GroupMessage, Sender: session.Username, Recipient: groupId, Text: text, Timestamp: DateTime.Now);
+        var offlineIds = new List<string>();
         foreach (GroupMemberRecord member in members)
         {
-            if (_registry.TryGetActive(member.Username, out ClientSession? target))
+            bool delivered = _registry.TryGetActive(member.Username, out ClientSession? target)
+                && await _router.SendToAsync(target, delivery, token).ConfigureAwait(false);
+
+            if (!delivered && member.UserId != session.UserId)
             {
-                await _router.SendToAsync(target, delivery, token).ConfigureAwait(false);
+                offlineIds.Add(member.UserId); // çevrimdışı (ya da tam bu sırada düştü): girince teslim edilmek üzere bekletilir
             }
         }
 
+        if (offlineIds.Count > 0)
+        {
+            int queued = await _messages.EnqueueGroupAsync(session.UserId!, groupId, offlineIds, text!, DateTime.UtcNow, token).ConfigureAwait(false);
+            WriteLog($"Grup {groupId}: {queued}/{offlineIds.Count} çevrimdışı üye için mesaj bekletiliyor.");
+        }
         return ErrorCode.None;
     }
 

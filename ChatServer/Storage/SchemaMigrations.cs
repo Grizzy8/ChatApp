@@ -75,6 +75,12 @@ internal static class SchemaMigrations
             PRIMARY KEY (GroupId, InviteeId)
         ) STRICT;
         CREATE INDEX IX_GroupInvites_Invitee ON GroupInvites (InviteeId);
+        """,
+
+        // v5: çevrimdışı grup üyeleri için üye başına kuyruk. GroupId doluysa kayıt bir grup mesajıdır (alıcı: RecipientId);
+        // boşsa özel mesajdır. Grup silinince bekleyen grup mesajları da silinir.
+        """
+        ALTER TABLE PendingMessages ADD COLUMN GroupId TEXT REFERENCES Groups(Id) ON DELETE CASCADE;
         """
     ];
 
