@@ -35,8 +35,14 @@ namespace ChatServer
             startButton = new Button();
             stopButton = new Button();
             logBox = new RichTextBox();
+            clientsGroup = new GroupBox();
+            clientsListView = new ListView();
+            userColumn = new ColumnHeader();
+            addressColumn = new ColumnHeader();
+            connectedColumn = new ColumnHeader();
             statusStrip = new StatusStrip();
             statusLabel = new ToolStripStatusLabel();
+            clientsGroup.SuspendLayout();
             topPanel.SuspendLayout();
             ((System.ComponentModel.ISupportInitialize)portUpDown).BeginInit();
             statusStrip.SuspendLayout();
@@ -102,6 +108,47 @@ namespace ChatServer
             logBox.TabIndex = 1;
             logBox.Text = "";
             //
+            // clientsGroup
+            //
+            clientsGroup.Controls.Add(clientsListView);
+            clientsGroup.Dock = DockStyle.Right;
+            clientsGroup.Location = new Point(380, 48);
+            clientsGroup.Name = "clientsGroup";
+            clientsGroup.Padding = new Padding(8, 4, 8, 8);
+            clientsGroup.Size = new Size(340, 382);
+            clientsGroup.TabIndex = 3;
+            clientsGroup.TabStop = false;
+            clientsGroup.Text = "Bağlı istemciler (0)";
+            //
+            // clientsListView
+            //
+            clientsListView.Columns.AddRange(new ColumnHeader[] { userColumn, addressColumn, connectedColumn });
+            clientsListView.Dock = DockStyle.Fill;
+            clientsListView.FullRowSelect = true;
+            clientsListView.HideSelection = false;
+            clientsListView.Location = new Point(8, 20);
+            clientsListView.MultiSelect = false;
+            clientsListView.Name = "clientsListView";
+            clientsListView.Size = new Size(324, 354);
+            clientsListView.TabIndex = 0;
+            clientsListView.UseCompatibleStateImageBehavior = false;
+            clientsListView.View = View.Details;
+            //
+            // userColumn
+            //
+            userColumn.Text = "Kullanıcı adı";
+            userColumn.Width = 110;
+            //
+            // addressColumn
+            //
+            addressColumn.Text = "Adres";
+            addressColumn.Width = 130;
+            //
+            // connectedColumn
+            //
+            connectedColumn.Text = "Bağlanma";
+            connectedColumn.Width = 70;
+            //
             // statusStrip
             //
             statusStrip.Items.AddRange(new ToolStripItem[] { statusLabel });
@@ -122,11 +169,13 @@ namespace ChatServer
             AutoScaleMode = AutoScaleMode.Font;
             ClientSize = new Size(720, 452);
             Controls.Add(logBox);
+            Controls.Add(clientsGroup);
             Controls.Add(topPanel);
             Controls.Add(statusStrip);
-            MinimumSize = new Size(560, 360);
+            MinimumSize = new Size(640, 360);
             Name = "ServerForm";
             Text = "ChatApp Sunucu";
+            clientsGroup.ResumeLayout(false);
             topPanel.ResumeLayout(false);
             topPanel.PerformLayout();
             ((System.ComponentModel.ISupportInitialize)portUpDown).EndInit();
@@ -144,6 +193,11 @@ namespace ChatServer
         private Button startButton;
         private Button stopButton;
         private RichTextBox logBox;
+        private GroupBox clientsGroup;
+        private ListView clientsListView;
+        private ColumnHeader userColumn;
+        private ColumnHeader addressColumn;
+        private ColumnHeader connectedColumn;
         private StatusStrip statusStrip;
         private ToolStripStatusLabel statusLabel;
     }

@@ -21,6 +21,7 @@ namespace ChatServer
 
             _host.LogWritten += OnLogWritten;
             _host.Stopped += OnHostStopped;
+            _host.ClientsChanged += OnClientsChanged;
             UpdateUiState(isRunning: false);
         }
 
@@ -52,6 +53,7 @@ namespace ChatServer
             // Kapanırken arayüze event göndermeyi bırak, sonra dinleyiciyi kapat.
             _host.LogWritten -= OnLogWritten;
             _host.Stopped -= OnHostStopped;
+            _host.ClientsChanged -= OnClientsChanged;
             _host.Dispose();
             base.OnFormClosing(e);
         }
@@ -64,6 +66,29 @@ namespace ChatServer
         private void OnHostStopped(object? sender, EventArgs e)
         {
             RunOnUiThread(() => UpdateUiState(isRunning: false));
+        }
+
+        private void OnClientsChanged(object? sender, EventArgs e)
+        {
+            // Liste UI thread'inde okunur; böylece sıra karışsa bile her zaman güncel durum gösterilir.
+            RunOnUiThread(() => RefreshClients(_host.GetClients()));
+        }
+
+        private void RefreshClients(IReadOnlyList<ClientInfo> clients)
+        {
+            clientsListView.BeginUpdate();
+            clientsListView.Items.Clear();
+            foreach (ClientInfo client in clients)
+            {
+                clientsListView.Items.Add(new ListViewItem(new[]
+                {
+                    client.Username,
+                    client.Endpoint,
+                    client.ConnectedAt.ToString("HH:mm:ss")
+                }));
+            }
+            clientsListView.EndUpdate();
+            clientsGroup.Text = $"Bağlı istemciler ({clients.Count})";
         }
 
         private void ReportStartFailure(string message)

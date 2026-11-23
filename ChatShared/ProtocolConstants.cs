@@ -19,4 +19,7 @@ public static class ProtocolConstants
     public const int MaxLineLength = 8 * 1024;
 
     public static readonly TimeSpan ConnectTimeout = TimeSpan.FromSeconds(5);
+
+    /// <summary>Bağlanan istemcinin Join mesajını göndermesi için tanınan süre.</summary>
+    public static readonly TimeSpan JoinTimeout = TimeSpan.FromSeconds(10);
 }
