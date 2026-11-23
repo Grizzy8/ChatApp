@@ -136,7 +136,7 @@ namespace ChatServer
             //
             // userColumn
             //
-            userColumn.Text = "Kullanıcı adı";
+            userColumn.Text = "Kullanıcı ID";
             userColumn.Width = 110;
             //
             // addressColumn

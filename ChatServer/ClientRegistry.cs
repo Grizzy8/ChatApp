@@ -61,7 +61,7 @@ public sealed class ClientRegistry
     /// <summary>Arayüzde göstermek için istemci bilgileri (katılma sırasına göre).</summary>
     public IReadOnlyList<ClientInfo> GetClients() =>
         GetOrderedEntries()
-            .Select(entry => new ClientInfo(entry.Key, entry.Value.Endpoint, entry.Value.ConnectedAt))
+            .Select(entry => new ClientInfo(entry.Value.UserId ?? "?", entry.Value.Endpoint, entry.Value.ConnectedAt))
             .ToList();
 
     // Kullanıcı adı olarak sözlük anahtarı kullanılır; böylece TryAdd ile AssignUsername

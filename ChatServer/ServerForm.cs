@@ -98,7 +98,7 @@ namespace ChatServer
             {
                 clientsListView.Items.Add(new ListViewItem(new[]
                 {
-                    client.Username,
+                    client.UserId,
                     client.Endpoint,
                     client.ConnectedAt.ToString("HH:mm:ss")
                 }));

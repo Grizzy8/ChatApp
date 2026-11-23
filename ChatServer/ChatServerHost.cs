@@ -297,7 +297,7 @@ public sealed partial class ChatServerHost : IDisposable
             return false;
         }
 
-        WriteLog($"{session.Username} katıldı ({session.Endpoint}).");
+        WriteLog($"{session.UserId} katıldı ({session.Endpoint}).");
         ClientsChanged?.Invoke(this, EventArgs.Empty);
 
         // Kişi listesi girişten hemen sonra, JoinAccepted'ın ardından gönderilir.
@@ -402,7 +402,7 @@ public sealed partial class ChatServerHost : IDisposable
                 return;
             }
 
-            WriteLog($"{session.Username} ayrıldı.");
+            WriteLog($"{session.UserId} ayrıldı.");
             ClientsChanged?.Invoke(this, EventArgs.Empty);
 
             if (!session.IsActive || token.IsCancellationRequested)
@@ -431,14 +431,14 @@ public sealed partial class ChatServerHost : IDisposable
             string? line = await session.ReadLineAsync(token).ConfigureAwait(false);
             if (line is null)
             {
-                WriteLog($"{session.Username} bağlantıyı kapattı.");
+                WriteLog($"{session.UserId} bağlantıyı kapattı.");
                 return;
             }
 
             ChatMessage? message = MessageSerializer.Deserialize(line);
             if (message is null)
             {
-                WriteLog($"{session.Username} geçersiz bir mesaj gönderdi, yok sayıldı.", ServerLogLevel.Error);
+                WriteLog($"{session.UserId} geçersiz bir mesaj gönderdi, yok sayıldı.", ServerLogLevel.Error);
                 continue;
             }
 
@@ -475,7 +475,7 @@ public sealed partial class ChatServerHost : IDisposable
                 await HandleGroupRequestAsync(session, message, token).ConfigureAwait(false);
                 break;
             default:
-                WriteLog($"{session.Username} geçersiz mesaj türü gönderdi ({message.Type}), yok sayıldı.", ServerLogLevel.Error);
+                WriteLog($"{session.UserId} geçersiz mesaj türü gönderdi ({message.Type}), yok sayıldı.", ServerLogLevel.Error);
                 break;
         }
     }
@@ -493,7 +493,7 @@ public sealed partial class ChatServerHost : IDisposable
     /// <summary>Reddedilen mesajı gönderene bildirir ve log'a yazar (mesaj içeriği yazılmaz).</summary>
     private async Task RejectMessageAsync(ClientSession session, ErrorCode reason, CancellationToken token)
     {
-        WriteLog($"{session.Username} tarafından gönderilen mesaj reddedildi ({reason}).", ServerLogLevel.Error);
+        WriteLog($"{session.UserId} tarafından gönderilen mesaj reddedildi ({reason}).", ServerLogLevel.Error);
         await SendErrorAsync(session, reason, token).ConfigureAwait(false);
     }
     /// <summary>Bir satır okur; süre dolarsa null döner. Sunucu durdurulursa OperationCanceledException fırlatır.</summary>
@@ -529,7 +529,8 @@ public sealed partial class ChatServerHost : IDisposable
         }
     }
 
-    private static string Describe(ClientSession session) => session.Username ?? session.Endpoint;
+    // Günlüklerde kullanıcı adı yerine yalnızca hesap kimliği (giriş yapılmamışsa bağlantı adresi) yer alır.
+    private static string Describe(ClientSession session) => session.UserId ?? session.Endpoint;
 
     private void WriteLog(string message, ServerLogLevel level = ServerLogLevel.Info)
     {

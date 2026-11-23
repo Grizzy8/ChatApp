@@ -101,7 +101,7 @@ public sealed partial class ChatServerHost
                 GroupResult renamed = await _groups.RenameAsync(groupId, userId, newName, token).ConfigureAwait(false);
                 if (renamed == GroupResult.Ok)
                 {
-                    WriteLog($"{session.Username} bir grubun adını değiştirdi ({groupId}).");
+                    WriteLog($"{session.UserId} bir grubun adını değiştirdi ({groupId}).");
                     await NotifyGroupChangedAsync(groupId, [], token).ConfigureAwait(false);
                 }
 
@@ -131,7 +131,7 @@ public sealed partial class ChatServerHost
             return ToErrorCode(result);
         }
 
-        WriteLog($"{session.Username} bir grup kurdu ({group!.Id}).");
+        WriteLog($"{session.UserId} bir grup kurdu ({group!.Id}).");
         await NotifyGroupChangedAsync(group.Id, [], token).ConfigureAwait(false);
         return ErrorCode.None;
     }
@@ -155,7 +155,7 @@ public sealed partial class ChatServerHost
             return ToErrorCode(result);
         }
 
-        WriteLog($"{session.Username} gruba ({groupId}) bir kullanıcıyı davet etti.");
+        WriteLog($"{session.UserId} gruba ({groupId}) bir kullanıcıyı davet etti.");
         await _router.SendToAsync(session, new ChatMessage(MessageType.InviteSent, Recipient: groupId, Text: invitee.Username), token).ConfigureAwait(false);
 
         if (_registry.TryGetActive(invitee.Username, out ClientSession? target))
@@ -207,7 +207,7 @@ public sealed partial class ChatServerHost
             return ToErrorCode(result);
         }
 
-        WriteLog($"{session.Username} bir grubu sildi ({groupId}).");
+        WriteLog($"{session.UserId} bir grubu sildi ({groupId}).");
         foreach (GroupMemberRecord member in members)
         {
             if (_registry.TryGetActive(member.Username, out ClientSession? target))
@@ -242,7 +242,7 @@ public sealed partial class ChatServerHost
             return ErrorCode.GroupNotFound;
         }
 
-        WriteLog($"{session.Username} → grup {groupId}: [grup mesajı]");
+        WriteLog($"{session.UserId} → grup {groupId}: [grup mesajı]");
 
         var delivery = new ChatMessage(MessageType.GroupMessage, Sender: session.Username, Recipient: groupId, Text: text, Timestamp: DateTime.Now);
         var offlineIds = new List<string>();

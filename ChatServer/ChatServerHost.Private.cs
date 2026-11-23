@@ -33,7 +33,7 @@ public sealed partial class ChatServerHost
         }
         catch (SqliteException ex)
         {
-            WriteLog($"{session.Username} için özel mesaj işlenirken veritabanı hatası: {ex.Message}", ServerLogLevel.Error);
+            WriteLog($"{session.UserId} için özel mesaj işlenirken veritabanı hatası: {ex.Message}", ServerLogLevel.Error);
             await SendErrorAsync(session, ErrorCode.ServerError, token).ConfigureAwait(false);
         }
     }
@@ -59,7 +59,7 @@ public sealed partial class ChatServerHost
         if (_registry.TryGetActive(target.Username, out ClientSession? targetSession)
             && await _router.SendToAsync(targetSession, delivery, token).ConfigureAwait(false))
         {
-            WriteLog($"{session.Username} → {target.Username}: [özel mesaj]");
+            WriteLog($"{session.UserId} → {target.Id}: [özel mesaj]");
 
             // Gönderen de aynı kopyayı alır: mesajın iletildiğini ve sunucu saatini görür.
             await _router.SendToAsync(session, delivery, token).ConfigureAwait(false);
@@ -73,7 +73,7 @@ public sealed partial class ChatServerHost
             return;
         }
 
-        WriteLog($"{session.Username} → {target.Username}: [özel mesaj, çevrimdışı alıcı için bekletiliyor]");
+        WriteLog($"{session.UserId} → {target.Id}: [özel mesaj, çevrimdışı alıcı için bekletiliyor]");
         await _router.SendToAsync(session, delivery with { Type = MessageType.PrivateQueued }, token).ConfigureAwait(false);
     }
 
@@ -111,12 +111,12 @@ public sealed partial class ChatServerHost
             if (deliveredCount > 0)
             {
                 await _messages.DeleteUpToAsync(session.UserId!, lastDeliveredId, token).ConfigureAwait(false);
-                WriteLog($"{session.Username} için {deliveredCount} bekleyen mesaj teslim edildi.");
+                WriteLog($"{session.UserId} için {deliveredCount} bekleyen mesaj teslim edildi.");
             }
         }
         catch (SqliteException ex)
         {
-            WriteLog($"{session.Username} için bekleyen mesajlar teslim edilemedi: {ex.Message}", ServerLogLevel.Error);
+            WriteLog($"{session.UserId} için bekleyen mesajlar teslim edilemedi: {ex.Message}", ServerLogLevel.Error);
         }
     }
 }

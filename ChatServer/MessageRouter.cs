@@ -57,7 +57,7 @@ public sealed class MessageRouter
         {
             // Yarım yazılmış satır akışı bozar; bu yüzden bağlantı tamamen kapatılır.
             // İstemcinin kendi okuma döngüsü bunu fark edip kaydını siler.
-            DeliveryFailed?.Invoke(this, $"{session.Username} kullanıcısına mesaj iletilemedi, bağlantısı kapatılıyor: {ex.Message}");
+            DeliveryFailed?.Invoke(this, $"{session.UserId} kimlikli kullanıcıya mesaj iletilemedi, bağlantısı kapatılıyor: {ex.Message}");
             session.Dispose();
             return false;
         }
