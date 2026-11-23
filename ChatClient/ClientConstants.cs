@@ -10,4 +10,6 @@ public static class ClientConstants
 
     public static readonly Color SystemMessageColor = Color.DimGray;
     public static readonly Color ErrorMessageColor = Color.Firebrick;
+    public static readonly Color OwnMessageColor = Color.FromArgb(0, 90, 170);
+    public static readonly Color OtherMessageColor = Color.FromArgb(30, 110, 60);
 }

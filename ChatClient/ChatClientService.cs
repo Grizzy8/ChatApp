@@ -117,6 +117,42 @@ public sealed class ChatClientService : IDisposable
         }
     }
 
+    /// <summary>
+    /// Genel sohbete mesaj gönderir. Bağlı değilse veya gönderme başarısız olursa false döner;
+    /// gönderme hatası bağlantının koptuğu anlamına gelir ve Disconnected olayı tetiklenir.
+    /// </summary>
+    public async Task<bool> SendChatAsync(string text, CancellationToken cancellationToken = default)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(text);
+        ArgumentOutOfRangeException.ThrowIfGreaterThan(text.Length, ProtocolConstants.MaxMessageLength);
+
+        MessageChannel? channel;
+        lock (_gate)
+        {
+            channel = _state == ConnectionState.Connected ? _channel : null;
+        }
+
+        if (channel is null)
+        {
+            return false;
+        }
+
+        try
+        {
+            await channel.SendAsync(new ChatMessage(MessageType.Chat, Text: text), cancellationToken).ConfigureAwait(false);
+            return true;
+        }
+        catch (OperationCanceledException)
+        {
+            return false;
+        }
+        catch (Exception ex) when (ex is IOException or SocketException or ObjectDisposedException)
+        {
+            EndConnection(channel, new DisconnectInfo(DisconnectReason.ConnectionLost, $"Mesaj gönderilemedi, bağlantı koptu: {ex.Message}"));
+            return false;
+        }
+    }
+
     /// <summary>Bağlantıyı kullanıcı isteğiyle keser. Bağlı değilse bir şey yapmaz.</summary>
     public async Task DisconnectAsync()
     {

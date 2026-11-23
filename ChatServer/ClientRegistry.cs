@@ -41,6 +41,10 @@ public sealed class ClientRegistry
     public IReadOnlyList<string> GetUsernames() =>
         GetOrderedEntries().Select(entry => entry.Key).ToList();
 
+    /// <summary>Şu an kayıtlı oturumlar (katılma sırasına göre).</summary>
+    public IReadOnlyList<ClientSession> GetSessions() =>
+        GetOrderedEntries().Select(entry => entry.Value).ToList();
+
     /// <summary>Arayüzde göstermek için istemci bilgileri (katılma sırasına göre).</summary>
     public IReadOnlyList<ClientInfo> GetClients() =>
         GetOrderedEntries()

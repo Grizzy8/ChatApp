@@ -15,8 +15,15 @@ public sealed class ChatServerHost : IDisposable
 
     private readonly object _gate = new();
     private readonly ClientRegistry _registry = new();
+    private readonly MessageRouter _router;
     private TcpListener? _listener;
     private CancellationTokenSource? _cts;
+
+    public ChatServerHost()
+    {
+        _router = new MessageRouter(_registry);
+        _router.DeliveryFailed += (_, text) => WriteLog(text, ServerLogLevel.Error);
+    }
 
     /// <summary>Sunucu bir log kaydı üretti.</summary>
     public event EventHandler<ServerLogEntry>? LogWritten;
@@ -157,7 +164,7 @@ public sealed class ChatServerHost : IDisposable
             {
                 await NotifyShuttingDownAsync(session).ConfigureAwait(false);
             }
-            catch (Exception ex) when (ex is IOException or SocketException or InvalidDataException)
+            catch (Exception ex) when (ex is IOException or SocketException or InvalidDataException or ObjectDisposedException)
             {
                 WriteLog($"{Describe(session)} ile bağlantı koptu: {ex.Message}");
             }
@@ -250,8 +257,45 @@ public sealed class ChatServerHost : IDisposable
                 return;
             }
 
-            // Sohbet ve özel mesajların iletilmesi sonraki adımlarda (MessageRouter) eklenecek.
+            await HandleMessageAsync(session, message, token).ConfigureAwait(false);
         }
+    }
+
+    private async Task HandleMessageAsync(ClientSession session, ChatMessage message, CancellationToken token)
+    {
+        switch (message.Type)
+        {
+            case MessageType.Chat:
+                await HandleChatAsync(session, message, token).ConfigureAwait(false);
+                break;
+            default:
+                WriteLog($"{session.Username} geçersiz mesaj türü gönderdi ({message.Type}), yok sayıldı.", ServerLogLevel.Error);
+                break;
+        }
+    }
+
+    /// <summary>Genel sohbet mesajını doğrular ve herkese iletir. Gönderen adı istemciden değil, oturumdan alınır.</summary>
+    private async Task HandleChatAsync(ClientSession session, ChatMessage message, CancellationToken token)
+    {
+        string? text = message.Text;
+
+        if (string.IsNullOrWhiteSpace(text))
+        {
+            await SendErrorAsync(session, ErrorCode.InvalidMessage, token).ConfigureAwait(false);
+            return;
+        }
+
+        if (text.Length > ProtocolConstants.MaxMessageLength)
+        {
+            await SendErrorAsync(session, ErrorCode.MessageTooLong, token).ConfigureAwait(false);
+            WriteLog($"{session.Username} çok uzun bir mesaj gönderdi ({text.Length} karakter), reddedildi.", ServerLogLevel.Error);
+            return;
+        }
+
+        WriteLog($"{session.Username}: {text}");
+
+        var broadcast = new ChatMessage(MessageType.Chat, Sender: session.Username, Text: text, Timestamp: DateTime.Now);
+        await _router.BroadcastAsync(broadcast, token).ConfigureAwait(false);
     }
 
     /// <summary>Bir satır okur; süre dolarsa null döner. Sunucu durdurulursa OperationCanceledException fırlatır.</summary>

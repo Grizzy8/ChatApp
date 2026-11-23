@@ -23,9 +23,11 @@ namespace ChatClient
             portUpDown.Maximum = ProtocolConstants.MaxPort;
             portUpDown.Value = ProtocolConstants.DefaultPort;
             usernameTextBox.MaxLength = ProtocolConstants.UsernameMaxLength;
+            messageTextBox.MaxLength = ProtocolConstants.MaxMessageLength;
 
             _client.StateChanged += OnStateChanged;
             _client.Disconnected += OnDisconnected;
+            _client.MessageReceived += OnMessageReceived;
 
             UpdateUiState(ConnectionState.Disconnected);
         }
@@ -75,11 +77,32 @@ namespace ChatClient
             await _client.DisconnectAsync();
         }
 
+        private async void SendButton_Click(object? sender, EventArgs e)
+        {
+            string text = messageTextBox.Text.Trim();
+            if (text.Length == 0)
+            {
+                return;
+            }
+
+            // Kutu hemen boşaltılır ki kullanıcı beklemeden yazmaya devam edebilsin;
+            // gönderme başarısız olursa metin geri yüklenir.
+            messageTextBox.Clear();
+            messageTextBox.Focus();
+
+            bool sent = await _client.SendChatAsync(text);
+            if (!sent && !IsDisposed && messageTextBox.TextLength == 0)
+            {
+                messageTextBox.Text = text;
+            }
+        }
+
         protected override void OnFormClosing(FormClosingEventArgs e)
         {
             // Kapanırken arayüze event göndermeyi bırak, devam eden bağlantı denemesini iptal et.
             _client.StateChanged -= OnStateChanged;
             _client.Disconnected -= OnDisconnected;
+            _client.MessageReceived -= OnMessageReceived;
             _lifetimeCts.Cancel();
             _client.Dispose();
             base.OnFormClosing(e);
@@ -90,6 +113,25 @@ namespace ChatClient
             if (!IsDisposed)
             {
                 UpdateUiState(state);
+            }
+        }
+
+        private void OnMessageReceived(object? sender, ChatMessage message)
+        {
+            if (IsDisposed)
+            {
+                return;
+            }
+
+            switch (message.Type)
+            {
+                case MessageType.Chat:
+                    bool isOwn = UsernameValidator.Comparer.Equals(message.Sender, _client.Username);
+                    _chatView.AppendChat(message.Timestamp ?? DateTime.Now, message.Sender ?? "?", message.Text ?? string.Empty, isOwn);
+                    break;
+                case MessageType.Error:
+                    _chatView.AppendError(ErrorMessages.Describe(message.ErrorCode));
+                    break;
             }
         }
 
@@ -130,7 +172,17 @@ namespace ChatClient
             portUpDown.Enabled = isDisconnected;
             usernameTextBox.Enabled = isDisconnected;
             connectButton.Enabled = isDisconnected;
-            disconnectButton.Enabled = state == ConnectionState.Connected;
+            bool isConnected = state == ConnectionState.Connected;
+            disconnectButton.Enabled = isConnected;
+            messageTextBox.Enabled = isConnected;
+            sendButton.Enabled = isConnected;
+
+            // Enter tuşu bağlı değilken Bağlan'a, bağlıyken Gönder'e basar.
+            AcceptButton = isConnected ? sendButton : connectButton;
+            if (isConnected)
+            {
+                messageTextBox.Focus();
+            }
 
             statusLabel.Text = state switch
             {

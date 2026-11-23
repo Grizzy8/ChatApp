@@ -39,8 +39,12 @@ namespace ChatClient
             connectButton = new Button();
             disconnectButton = new Button();
             chatBox = new RichTextBox();
+            messagePanel = new Panel();
+            messageTextBox = new TextBox();
+            sendButton = new Button();
             statusStrip = new StatusStrip();
             statusLabel = new ToolStripStatusLabel();
+            messagePanel.SuspendLayout();
             connectionPanel.SuspendLayout();
             ((System.ComponentModel.ISupportInitialize)portUpDown).BeginInit();
             statusStrip.SuspendLayout();
@@ -142,6 +146,36 @@ namespace ChatClient
             chatBox.TabIndex = 1;
             chatBox.Text = "";
             //
+            // messagePanel
+            //
+            messagePanel.Controls.Add(messageTextBox);
+            messagePanel.Controls.Add(sendButton);
+            messagePanel.Dock = DockStyle.Bottom;
+            messagePanel.Location = new Point(0, 437);
+            messagePanel.Name = "messagePanel";
+            messagePanel.Size = new Size(840, 44);
+            messagePanel.TabIndex = 3;
+            //
+            // messageTextBox
+            //
+            messageTextBox.Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right;
+            messageTextBox.Location = new Point(11, 10);
+            messageTextBox.Name = "messageTextBox";
+            messageTextBox.PlaceholderText = "Mesajınızı yazın ve Enter'a basın";
+            messageTextBox.Size = new Size(718, 23);
+            messageTextBox.TabIndex = 0;
+            //
+            // sendButton
+            //
+            sendButton.Anchor = AnchorStyles.Top | AnchorStyles.Right;
+            sendButton.Location = new Point(737, 8);
+            sendButton.Name = "sendButton";
+            sendButton.Size = new Size(92, 27);
+            sendButton.TabIndex = 1;
+            sendButton.Text = "Gönder";
+            sendButton.UseVisualStyleBackColor = true;
+            sendButton.Click += SendButton_Click;
+            //
             // statusStrip
             //
             statusStrip.Items.AddRange(new ToolStripItem[] { statusLabel });
@@ -163,11 +197,14 @@ namespace ChatClient
             AutoScaleMode = AutoScaleMode.Font;
             ClientSize = new Size(840, 503);
             Controls.Add(chatBox);
+            Controls.Add(messagePanel);
             Controls.Add(connectionPanel);
             Controls.Add(statusStrip);
             MinimumSize = new Size(560, 360);
             Name = "ClientForm";
             Text = "ChatApp İstemci";
+            messagePanel.ResumeLayout(false);
+            messagePanel.PerformLayout();
             connectionPanel.ResumeLayout(false);
             ((System.ComponentModel.ISupportInitialize)portUpDown).EndInit();
             statusStrip.ResumeLayout(false);
@@ -188,6 +225,9 @@ namespace ChatClient
         private Button connectButton;
         private Button disconnectButton;
         private RichTextBox chatBox;
+        private Panel messagePanel;
+        private TextBox messageTextBox;
+        private Button sendButton;
         private StatusStrip statusStrip;
         private ToolStripStatusLabel statusLabel;
     }
