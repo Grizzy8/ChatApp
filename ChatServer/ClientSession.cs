@@ -9,12 +9,21 @@ namespace ChatServer;
 public sealed class ClientSession : IDisposable
 {
     private readonly MessageChannel _channel;
+    private volatile bool _isActive;
 
     public ClientSession(TcpClient tcpClient)
     {
         _channel = new MessageChannel(tcpClient);
         ConnectedAt = DateTime.Now;
     }
+
+    /// <summary>
+    /// JoinAccepted gönderildikten sonra true olur. Yayınlar yalnızca aktif oturumlara gider;
+    /// böylece katılmakta olan bir istemci el sıkışması bitmeden başka mesaj almaz.
+    /// </summary>
+    public bool IsActive => _isActive;
+
+    public void MarkActive() => _isActive = true;
 
     /// <summary>Join kabul edilene kadar null kalır.</summary>
     public string? Username { get; private set; }

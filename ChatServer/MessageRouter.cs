@@ -9,8 +9,8 @@ namespace ChatServer;
 /// </summary>
 public sealed class MessageRouter
 {
-    // Yazma işlemi bu sürede bitmezse istemci takılmış sayılır ve bağlantısı kapatılır.
-    private static readonly TimeSpan DeliveryTimeout = TimeSpan.FromSeconds(5);
+    /// <summary>Yazma işlemi bu sürede bitmezse istemci takılmış sayılır ve bağlantısı kapatılır.</summary>
+    public static readonly TimeSpan DeliveryTimeout = TimeSpan.FromSeconds(5);
 
     private readonly ClientRegistry _registry;
 
@@ -23,11 +23,15 @@ public sealed class MessageRouter
     /// <summary>Bir mesaj bir istemciye iletilemedi; olay verisi log metnidir.</summary>
     public event EventHandler<string>? DeliveryFailed;
 
-    /// <summary>Mesajı gönderen dahil, kayıtlı tüm istemcilere iletir.</summary>
-    public async Task BroadcastAsync(ChatMessage message, CancellationToken cancellationToken)
+    /// <summary>
+    /// Mesajı katılımı tamamlanmış (aktif) tüm istemcilere iletir; excluded verilirse o oturum atlanır.
+    /// </summary>
+    public async Task BroadcastAsync(ChatMessage message, CancellationToken cancellationToken, ClientSession? excluded = null)
     {
-        IReadOnlyList<ClientSession> sessions = _registry.GetSessions();
-        await Task.WhenAll(sessions.Select(session => DeliverAsync(session, message, cancellationToken)))
+        IEnumerable<ClientSession> recipients = _registry.GetSessions()
+            .Where(session => session.IsActive && !ReferenceEquals(session, excluded));
+
+        await Task.WhenAll(recipients.Select(session => DeliverAsync(session, message, cancellationToken)))
             .ConfigureAwait(false);
     }
 

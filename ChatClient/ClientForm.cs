@@ -24,6 +24,7 @@ namespace ChatClient
             portUpDown.Value = ProtocolConstants.DefaultPort;
             usernameTextBox.MaxLength = ProtocolConstants.UsernameMaxLength;
             messageTextBox.MaxLength = ProtocolConstants.MaxMessageLength;
+            onlineListBox.Sorted = true;
 
             _client.StateChanged += OnStateChanged;
             _client.Disconnected += OnDisconnected;
@@ -66,10 +67,10 @@ namespace ChatClient
             {
                 _chatView.AppendError($"Bağlantı kurulamadı: {result.Error}");
                 MessageBox.Show(this, result.Error, "Bağlantı kurulamadı", MessageBoxButtons.OK, MessageBoxIcon.Warning);
-                return;
             }
 
-            _chatView.AppendSystem($"Sunucuya bağlandınız. Çevrimiçi: {string.Join(", ", result.Users ?? Array.Empty<string>())}");
+            // Başarılıysa "bağlandınız" satırı ve kullanıcı listesi, servisin ilettiği
+            // JoinAccepted olayıyla (OnMessageReceived) sırayla gösterilir.
         }
 
         private async void DisconnectButton_Click(object? sender, EventArgs e)
@@ -125,6 +126,19 @@ namespace ChatClient
 
             switch (message.Type)
             {
+                case MessageType.JoinAccepted:
+                    IReadOnlyList<string> users = message.Users ?? Array.Empty<string>();
+                    SetOnlineUsers(users);
+                    _chatView.AppendSystem($"Sunucuya bağlandınız. Çevrimiçi: {string.Join(", ", users)}");
+                    break;
+                case MessageType.UserJoined when message.Sender is not null:
+                    AddOnlineUser(message.Sender);
+                    _chatView.AppendLine(message.Timestamp ?? DateTime.Now, $"{message.Sender} sohbete katıldı.", ClientConstants.SystemMessageColor);
+                    break;
+                case MessageType.UserLeft when message.Sender is not null:
+                    RemoveOnlineUser(message.Sender);
+                    _chatView.AppendLine(message.Timestamp ?? DateTime.Now, $"{message.Sender} sohbetten ayrıldı.", ClientConstants.SystemMessageColor);
+                    break;
                 case MessageType.Chat:
                     bool isOwn = UsernameValidator.Comparer.Equals(message.Sender, _client.Username);
                     _chatView.AppendChat(message.Timestamp ?? DateTime.Now, message.Sender ?? "?", message.Text ?? string.Empty, isOwn);
@@ -135,12 +149,60 @@ namespace ChatClient
             }
         }
 
+        private void SetOnlineUsers(IEnumerable<string> users)
+        {
+            onlineListBox.BeginUpdate();
+            onlineListBox.Items.Clear();
+            foreach (string user in users)
+            {
+                onlineListBox.Items.Add(user);
+            }
+            onlineListBox.EndUpdate();
+            UpdateOnlineCount();
+        }
+
+        private void AddOnlineUser(string username)
+        {
+            if (FindOnlineUserIndex(username) < 0)
+            {
+                onlineListBox.Items.Add(username);
+                UpdateOnlineCount();
+            }
+        }
+
+        private void RemoveOnlineUser(string username)
+        {
+            int index = FindOnlineUserIndex(username);
+            if (index >= 0)
+            {
+                onlineListBox.Items.RemoveAt(index);
+                UpdateOnlineCount();
+            }
+        }
+
+        private int FindOnlineUserIndex(string username)
+        {
+            for (int i = 0; i < onlineListBox.Items.Count; i++)
+            {
+                if (UsernameValidator.Comparer.Equals(onlineListBox.Items[i] as string, username))
+                {
+                    return i;
+                }
+            }
+
+            return -1;
+        }
+
+        private void UpdateOnlineCount() => onlineGroup.Text = $"Çevrimiçi ({onlineListBox.Items.Count})";
+
         private void OnDisconnected(object? sender, DisconnectInfo info)
         {
             if (IsDisposed)
             {
                 return;
             }
+
+            SetOnlineUsers(Array.Empty<string>());
 
             if (info.Reason == DisconnectReason.UserRequested)
             {

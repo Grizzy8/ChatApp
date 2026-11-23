@@ -16,6 +16,7 @@ public sealed class ChatServerHost : IDisposable
     private readonly object _gate = new();
     private readonly ClientRegistry _registry = new();
     private readonly MessageRouter _router;
+    private readonly SemaphoreSlim _membershipLock = new(1, 1);
     private TcpListener? _listener;
     private CancellationTokenSource? _cts;
 
@@ -174,11 +175,7 @@ public sealed class ChatServerHost : IDisposable
             }
             finally
             {
-                if (_registry.Remove(session))
-                {
-                    WriteLog($"{session.Username} ayrıldı.");
-                    ClientsChanged?.Invoke(this, EventArgs.Empty);
-                }
+                await RemoveAndAnnounceAsync(session, token).ConfigureAwait(false);
             }
         }
     }
@@ -212,9 +209,9 @@ public sealed class ChatServerHost : IDisposable
         }
 
         ErrorCode rejection = UsernameValidator.Validate(message.Sender);
-        if (rejection == ErrorCode.None && !_registry.TryAdd(message.Sender!, session))
+        if (rejection == ErrorCode.None)
         {
-            rejection = ErrorCode.UsernameTaken;
+            rejection = await RegisterAndAnnounceAsync(session, message.Sender!, token).ConfigureAwait(false);
         }
 
         if (rejection != ErrorCode.None)
@@ -224,13 +221,78 @@ public sealed class ChatServerHost : IDisposable
             return false;
         }
 
-        await session.SendAsync(
-            new ChatMessage(MessageType.JoinAccepted, Timestamp: DateTime.Now, Users: _registry.GetUsernames()),
-            token).ConfigureAwait(false);
-
         WriteLog($"{session.Username} katıldı ({session.Endpoint}).");
         ClientsChanged?.Invoke(this, EventArgs.Empty);
         return true;
+    }
+
+    /// <summary>
+    /// Kullanıcıyı kaydeder, JoinAccepted yanıtını gönderir ve diğerlerine UserJoined bildirir.
+    /// Katılma ve ayrılma işlemleri sırayla yürütülür; böylece her istemcinin gördüğü kullanıcı listesi
+    /// ile sonradan aldığı UserJoined/UserLeft olayları birbiriyle tutarlı kalır.
+    /// </summary>
+    private async Task<ErrorCode> RegisterAndAnnounceAsync(ClientSession session, string username, CancellationToken token)
+    {
+        await _membershipLock.WaitAsync(token).ConfigureAwait(false);
+        try
+        {
+            if (!_registry.TryAdd(username, session))
+            {
+                return ErrorCode.UsernameTaken;
+            }
+
+            using (var sendCts = CancellationTokenSource.CreateLinkedTokenSource(token))
+            {
+                sendCts.CancelAfter(MessageRouter.DeliveryTimeout);
+                await session.SendAsync(
+                    new ChatMessage(MessageType.JoinAccepted, Timestamp: DateTime.Now, Users: _registry.GetUsernames()),
+                    sendCts.Token).ConfigureAwait(false);
+            }
+
+            session.MarkActive();
+
+            var joined = new ChatMessage(MessageType.UserJoined, Sender: username, Timestamp: DateTime.Now);
+            await _router.BroadcastAsync(joined, token, excluded: session).ConfigureAwait(false);
+            return ErrorCode.None;
+        }
+        finally
+        {
+            _membershipLock.Release();
+        }
+    }
+
+    /// <summary>Oturumu kayıttan çıkarır; katılımı tamamlanmış bir kullanıcıysa diğerlerine UserLeft bildirir.</summary>
+    private async Task RemoveAndAnnounceAsync(ClientSession session, CancellationToken token)
+    {
+        // Bekleme iptal edilemez: sunucu kapanırken bile kayıt temizliği tamamlanmalıdır.
+        // Kilidi tutan işlemler zaman aşımıyla sınırlı olduğu için bekleme sonsuza uzamaz.
+        await _membershipLock.WaitAsync().ConfigureAwait(false);
+        try
+        {
+            if (!_registry.Remove(session))
+            {
+                return;
+            }
+
+            WriteLog($"{session.Username} ayrıldı.");
+            ClientsChanged?.Invoke(this, EventArgs.Empty);
+
+            if (!session.IsActive || token.IsCancellationRequested)
+            {
+                return; // Hiç duyurulmamış bir katılım ya da sunucunun kapanışı: bildirilecek kimse yok.
+            }
+
+            var left = new ChatMessage(MessageType.UserLeft, Sender: session.Username, Timestamp: DateTime.Now);
+            await _router.BroadcastAsync(left, token).ConfigureAwait(false);
+        }
+        catch (OperationCanceledException) when (token.IsCancellationRequested)
+        {
+            // Sunucu bu sırada kapandı; kalan istemciler zaten kapanış bildirimi alıyor.
+        }
+        finally
+        {
+            _membershipLock.Release();
+        }
     }
 
     /// <summary>Katılmış istemciden gelen mesajları, bağlantı kapanana veya Leave gelene kadar okur.</summary>

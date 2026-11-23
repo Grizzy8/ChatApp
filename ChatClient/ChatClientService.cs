@@ -28,7 +28,10 @@ public sealed class ChatClientService : IDisposable
     /// <summary>Bağlantı durumu değişti.</summary>
     public event EventHandler<ConnectionState>? StateChanged;
 
-    /// <summary>Sunucudan (hata ve kapanış bildirimleri dışında) bir mesaj geldi.</summary>
+    /// <summary>
+    /// Sunucudan bir mesaj geldi (kapanış bildirimi hariç). Bağlantı kurulunca, çevrimiçi kullanıcı
+    /// listesini taşıyan bir JoinAccepted mesajı da ilk olay olarak buradan iletilir.
+    /// </summary>
     public event EventHandler<ChatMessage>? MessageReceived;
 
     /// <summary>Kurulmuş bir bağlantı sona erdi (kullanıcı isteğiyle veya beklenmedik şekilde).</summary>
@@ -92,7 +95,7 @@ public sealed class ChatClientService : IDisposable
                 return AbortConnect(tcpClient, result);
             }
 
-            CompleteConnect(channel, username);
+            CompleteConnect(channel, username, result.Users ?? Array.Empty<string>());
             return result;
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
@@ -226,7 +229,7 @@ public sealed class ChatClientService : IDisposable
         return failure;
     }
 
-    private void CompleteConnect(MessageChannel channel, string username)
+    private void CompleteConnect(MessageChannel channel, string username, IReadOnlyList<string> users)
     {
         var cts = new CancellationTokenSource();
 
@@ -237,10 +240,18 @@ public sealed class ChatClientService : IDisposable
             _username = username;
             _shutdownNoticed = false;
             _state = ConnectionState.Connected;
-            _receiveTask = Task.Run(() => ReceiveLoopAsync(channel, cts.Token));
         }
 
         RaiseStateChanged(ConnectionState.Connected);
+
+        // Başlangıç kullanıcı listesi, sonradan gelecek UserJoined/UserLeft olaylarından önce
+        // aynı sıralı kanaldan iletilir; dinleme döngüsü ancak bundan sonra başlar.
+        RaiseMessageReceived(new ChatMessage(MessageType.JoinAccepted, Users: users));
+
+        lock (_gate)
+        {
+            _receiveTask = Task.Run(() => ReceiveLoopAsync(channel, cts.Token));
+        }
     }
 
     /// <summary>Bağlantı süresince sunucudan gelen mesajları okur. Hiçbir hatayı dışarı sızdırmaz.</summary>

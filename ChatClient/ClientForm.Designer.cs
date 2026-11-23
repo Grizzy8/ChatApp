@@ -39,11 +39,14 @@ namespace ChatClient
             connectButton = new Button();
             disconnectButton = new Button();
             chatBox = new RichTextBox();
+            onlineGroup = new GroupBox();
+            onlineListBox = new ListBox();
             messagePanel = new Panel();
             messageTextBox = new TextBox();
             sendButton = new Button();
             statusStrip = new StatusStrip();
             statusLabel = new ToolStripStatusLabel();
+            onlineGroup.SuspendLayout();
             messagePanel.SuspendLayout();
             connectionPanel.SuspendLayout();
             ((System.ComponentModel.ISupportInitialize)portUpDown).BeginInit();
@@ -146,6 +149,28 @@ namespace ChatClient
             chatBox.TabIndex = 1;
             chatBox.Text = "";
             //
+            // onlineGroup
+            //
+            onlineGroup.Controls.Add(onlineListBox);
+            onlineGroup.Dock = DockStyle.Right;
+            onlineGroup.Location = new Point(660, 41);
+            onlineGroup.Name = "onlineGroup";
+            onlineGroup.Padding = new Padding(8, 4, 8, 8);
+            onlineGroup.Size = new Size(180, 396);
+            onlineGroup.TabIndex = 4;
+            onlineGroup.TabStop = false;
+            onlineGroup.Text = "Çevrimiçi (0)";
+            //
+            // onlineListBox
+            //
+            onlineListBox.BorderStyle = BorderStyle.FixedSingle;
+            onlineListBox.Dock = DockStyle.Fill;
+            onlineListBox.FormattingEnabled = true;
+            onlineListBox.Location = new Point(8, 20);
+            onlineListBox.Name = "onlineListBox";
+            onlineListBox.Size = new Size(164, 368);
+            onlineListBox.TabIndex = 0;
+            //
             // messagePanel
             //
             messagePanel.Controls.Add(messageTextBox);
@@ -197,12 +222,14 @@ namespace ChatClient
             AutoScaleMode = AutoScaleMode.Font;
             ClientSize = new Size(840, 503);
             Controls.Add(chatBox);
+            Controls.Add(onlineGroup);
             Controls.Add(messagePanel);
             Controls.Add(connectionPanel);
             Controls.Add(statusStrip);
             MinimumSize = new Size(560, 360);
             Name = "ClientForm";
             Text = "ChatApp İstemci";
+            onlineGroup.ResumeLayout(false);
             messagePanel.ResumeLayout(false);
             messagePanel.PerformLayout();
             connectionPanel.ResumeLayout(false);
@@ -225,6 +252,8 @@ namespace ChatClient
         private Button connectButton;
         private Button disconnectButton;
         private RichTextBox chatBox;
+        private GroupBox onlineGroup;
+        private ListBox onlineListBox;
         private Panel messagePanel;
         private TextBox messageTextBox;
         private Button sendButton;
