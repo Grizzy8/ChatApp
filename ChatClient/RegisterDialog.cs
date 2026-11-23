@@ -6,22 +6,16 @@ namespace ChatClient;
 /// Yeni hesap oluşturma penceresi: kullanıcı adı, parola ve parola tekrarı. Parola yanlış yazılıp hesabın
 /// kilitli kalmaması için tekrar alanı zorunludur. Geçersiz girişte pencere kapanmaz, nedeni gösterilir.
 /// </summary>
-public sealed class RegisterDialog : Form
+public sealed class RegisterDialog : ThemedForm
 {
     private readonly TextBox _usernameBox = new() { Dock = DockStyle.Fill, MaxLength = ProtocolConstants.UsernameMaxLength };
     private readonly TextBox _passwordBox = new() { Dock = DockStyle.Fill, UseSystemPasswordChar = true, MaxLength = ProtocolConstants.PasswordMaxLength };
     private readonly TextBox _confirmBox = new() { Dock = DockStyle.Fill, UseSystemPasswordChar = true, MaxLength = ProtocolConstants.PasswordMaxLength };
-    private readonly Label _errorLabel = new() { AutoSize = true, ForeColor = ClientConstants.ErrorMessageColor, Margin = new Padding(3, 8, 3, 0) };
+    private readonly Label _errorLabel = new() { AutoSize = true, ForeColor = Theme.ErrorText, Margin = new Padding(3, 8, 3, 0) };
 
     public RegisterDialog(string suggestedUsername)
+        : base("Yeni hesap oluştur")
     {
-        Text = "Yeni hesap oluştur";
-        FormBorderStyle = FormBorderStyle.FixedDialog;
-        StartPosition = FormStartPosition.CenterParent;
-        MinimizeBox = false;
-        MaximizeBox = false;
-        ShowInTaskbar = false;
-        AutoScaleMode = AutoScaleMode.Font;
         AutoSize = true;
         AutoSizeMode = AutoSizeMode.GrowAndShrink;
 
@@ -36,8 +30,8 @@ public sealed class RegisterDialog : Form
         var hint = new Label
         {
             AutoSize = true,
-            MaximumSize = new Size(360, 0),
-            ForeColor = SystemColors.GrayText,
+            MaximumSize = new Size(Scaled(360), 0),
+            ForeColor = Theme.Muted,
             Text = $"Kullanıcı adı {ProtocolConstants.UsernameMinLength}-{ProtocolConstants.UsernameMaxLength} karakter (harf, rakam, _). " +
                    $"Parola en az {ProtocolConstants.PasswordMinLength} karakter. Parolanızı unutursanız sıfırlanamaz."
         };
@@ -54,7 +48,7 @@ public sealed class RegisterDialog : Form
             Dock = DockStyle.Fill
         };
         layout.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
-        layout.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 220));
+        layout.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, Scaled(220)));
 
         AddRow(layout, "Kullanıcı adı:", _usernameBox);
         AddRow(layout, "Parola:", _passwordBox);
@@ -70,6 +64,8 @@ public sealed class RegisterDialog : Form
         layout.RowCount++;
 
         Controls.Add(layout);
+        okButton.Tag = "accent";
+        Theme.Apply(layout, Theme.Background);
     }
 
     public string Username => _usernameBox.Text.Trim();

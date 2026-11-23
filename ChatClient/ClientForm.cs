@@ -2,23 +2,22 @@ using ChatShared;
 
 namespace ChatClient
 {
-    /// <summary>İstemci arayüzü: bağlantı bilgileri, Bağlan/Bağlantıyı Kes ve durum gösterimi.</summary>
+    /// <summary>İstemci ana penceresi: giriş, bağlantı durumu ve sunucudan gelen iletilerin dağıtımı.</summary>
     public partial class ClientForm : Form
     {
         private readonly ChatClientService _client;
-        private readonly ChatView _chatView;
+        private readonly MessageView _view;
         private readonly CancellationTokenSource _lifetimeCts = new();
+        private readonly System.Windows.Forms.Timer _noticeTimer = new() { Interval = ClientConstants.NoticeDurationMs };
 
         public ClientForm()
         {
             InitializeComponent();
-            InitializeContactsTab();
-            InitializeGroupsTab();
 
             // Windows Forms, form oluşturulurken UI thread'ine ait bir SynchronizationContext kurar;
             // servis event'lerini bu context ile UI thread'inde tetikler.
             _client = new ChatClientService(SynchronizationContext.Current);
-            _chatView = new ChatView(chatBox);
+            _view = new MessageView(messagesBox);
 
             hostTextBox.Text = ProtocolConstants.DefaultHost;
             portUpDown.Minimum = ProtocolConstants.MinPort;
@@ -26,8 +25,17 @@ namespace ChatClient
             portUpDown.Value = ProtocolConstants.DefaultPort;
             usernameTextBox.MaxLength = ProtocolConstants.UsernameMaxLength;
             passwordTextBox.MaxLength = ProtocolConstants.PasswordMaxLength;
-            messageTextBox.MaxLength = ProtocolConstants.MaxMessageLength;
-            onlineListBox.Sorted = true;
+
+            _noticeTimer.Tick += (_, _) =>
+            {
+                _noticeTimer.Stop();
+                noticeLabel.Text = string.Empty;
+            };
+
+            InitializeConversations();
+            InitializeSearch();
+            InitializeContacts();
+            InitializeGroups();
 
             _client.StateChanged += OnStateChanged;
             _client.Disconnected += OnDisconnected;
@@ -35,6 +43,49 @@ namespace ChatClient
 
             UpdateUiState(ConnectionState.Disconnected);
         }
+
+        // Pencere ekrandan büyükse (küçük çözünürlük ya da yüksek ölçek) çalışma alanına sığdırılır.
+        protected override void OnLoad(EventArgs e)
+        {
+            base.OnLoad(e);
+            FitToWorkingArea();
+            Resize += (_, _) => UpdateHeader();
+        }
+
+        private void FitToWorkingArea()
+        {
+            Rectangle area = Screen.FromControl(this).WorkingArea;
+            int width = Math.Min(Width, (int)(area.Width * 0.96));
+            int height = Math.Min(Height, (int)(area.Height * 0.96));
+
+            MinimumSize = new Size(Math.Min(MinimumSize.Width, width), Math.Min(MinimumSize.Height, height));
+            Size = new Size(width, height);
+            Location = new Point(
+                Math.Clamp(Location.X, area.Left, Math.Max(area.Left, area.Right - width)),
+                Math.Clamp(Location.Y, area.Top, Math.Max(area.Top, area.Bottom - height)));
+        }
+
+        /// <summary>Mantıksal (96 DPI) pikseli bu pencerenin DPI'ına göre ölçekler.</summary>
+        private int Scale(int pixels) => (int)Math.Round(pixels * DeviceDpi / 96.0);
+
+        protected override void OnHandleCreated(EventArgs e)
+        {
+            base.OnHandleCreated(e);
+            Theme.UseDarkTitleBar(Handle);
+        }
+
+        protected override void OnFormClosing(FormClosingEventArgs e)
+        {
+            // Kapanırken arayüze event göndermeyi bırak, devam eden bağlantı denemesini iptal et.
+            _client.StateChanged -= OnStateChanged;
+            _client.Disconnected -= OnDisconnected;
+            _client.MessageReceived -= OnMessageReceived;
+            _lifetimeCts.Cancel();
+            _client.Dispose();
+            base.OnFormClosing(e);
+        }
+
+        // ---- giriş ----
 
         private async void ConnectButton_Click(object? sender, EventArgs e)
         {
@@ -44,7 +95,7 @@ namespace ChatClient
             string? validationError = ValidateLogin(hostTextBox.Text.Trim(), username, password);
             if (validationError is not null)
             {
-                MessageBox.Show(this, validationError, "Eksik veya hatalı bilgi", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                loginErrorLabel.Text = validationError;
                 return;
             }
 
@@ -55,7 +106,7 @@ namespace ChatClient
         {
             if (hostTextBox.Text.Trim().Length == 0)
             {
-                MessageBox.Show(this, "Lütfen sunucu adresini girin.", "Eksik bilgi", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                loginErrorLabel.Text = "Lütfen sunucu adresini girin.";
                 return;
             }
 
@@ -72,15 +123,13 @@ namespace ChatClient
 
         private async Task ConnectAsync(string username, string password, AuthMode mode)
         {
-            string host = hostTextBox.Text.Trim();
-            int port = (int)portUpDown.Value;
-
-            _chatView.AppendSystem($"{host}:{port} adresine bağlanılıyor...");
+            loginErrorLabel.Text = string.Empty;
 
             ConnectResult result;
             try
             {
-                result = await _client.ConnectAsync(host, port, username, password, mode, _lifetimeCts.Token);
+                result = await _client.ConnectAsync(
+                    hostTextBox.Text.Trim(), (int)portUpDown.Value, username, password, mode, _lifetimeCts.Token);
             }
             catch (InvalidOperationException ex)
             {
@@ -95,13 +144,11 @@ namespace ChatClient
             if (!result.Success)
             {
                 string title = mode == AuthMode.Register ? "Hesap oluşturulamadı" : "Giriş yapılamadı";
-                _chatView.AppendError($"{title}: {result.Error}");
-                MessageBox.Show(this, result.Error, title, MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                loginErrorLabel.Text = $"{title}: {result.Error}";
                 return;
             }
 
-            // Parola işi bitince bellekte ve kutuda bırakılmaz. Başarılıysa "bağlandınız" satırı ve kullanıcı
-            // listesi, servisin ilettiği JoinAccepted olayıyla (OnMessageReceived) sırayla gösterilir.
+            // Parola işi bitince bellekte ve kutuda bırakılmaz. Sohbet ekranı JoinAccepted olayıyla kurulur.
             passwordTextBox.Clear();
             usernameTextBox.Text = result.Username;
         }
@@ -109,271 +156,6 @@ namespace ChatClient
         private async void DisconnectButton_Click(object? sender, EventArgs e)
         {
             await _client.DisconnectAsync();
-        }
-
-        private async void SendButton_Click(object? sender, EventArgs e)
-        {
-            string text = messageTextBox.Text.Trim();
-            if (text.Length == 0)
-            {
-                return;
-            }
-
-            // Kutu hemen boşaltılır ki kullanıcı beklemeden yazmaya devam edebilsin;
-            // gönderme başarısız olursa metin geri yüklenir.
-            messageTextBox.Clear();
-            messageTextBox.Focus();
-
-            // Alıcı gönderme anında okunur; beklerken seçim değişse bile mesaj niyet edilen kişiye gider.
-            string? recipient = SelectedRecipient;
-            string? groupId = _chosenGroupId;
-            bool sent = groupId is not null
-                ? await _client.SendGroupMessageAsync(groupId, text)
-                : recipient is null
-                    ? await _client.SendChatAsync(text)
-                    : await _client.SendPrivateAsync(recipient, text);
-
-            if (!sent && !IsDisposed && messageTextBox.TextLength == 0)
-            {
-                messageTextBox.Text = text;
-            }
-        }
-
-        // Seçilen alıcı: çevrimiçi listesinden ya da kişilerden (çift tık) gelir; çevrimdışı olsa da geçerlidir,
-        // çünkü mesaj sunucuda bekletilip alıcı girince teslim edilir. "Herkese dön" ile temizlenir.
-        private string? _chosenRecipient;
-        private bool _isSyncingRecipient; // kodla yapılan liste değişiklikleri alıcıyı silmesin
-
-        private string? SelectedRecipient => _chosenRecipient;
-
-        private void SetRecipient(string? username)
-        {
-            _chosenRecipient = username;
-            if (username is not null)
-            {
-                _chosenGroupId = null; // hedef ya kişi ya da grup olabilir
-            }
-
-            UpdateRecipientUi();
-        }
-
-        private void ClearRecipientButton_Click(object? sender, EventArgs e)
-        {
-            _isSyncingRecipient = true;
-            try { onlineListBox.ClearSelected(); } finally { _isSyncingRecipient = false; }
-            _chosenGroupId = null;
-            SetRecipient(null);
-            messageTextBox.Focus();
-        }
-
-        private void OnlineListBox_SelectedIndexChanged(object? sender, EventArgs e)
-        {
-            if (_isSyncingRecipient)
-            {
-                return;
-            }
-
-            string? selected = onlineListBox.SelectedItem as string;
-
-            // Kendine özel mesaj anlamsızdır: kendi adını seçmek seçimi kaldırır.
-            if (UsernameValidator.Comparer.Equals(selected, _client.Username))
-            {
-                onlineListBox.ClearSelected();
-                return;
-            }
-
-            SetRecipient(selected);
-        }
-
-        private void UpdateRecipientUi()
-        {
-            if (_chosenGroupId is not null)
-            {
-                recipientLabel.Text = $"→ Grup: {GroupNameOf(_chosenGroupId)}";
-                recipientLabel.ForeColor = ClientConstants.GroupMessageColor;
-                clearRecipientButton.Visible = true;
-                return;
-            }
-
-            string? recipient = SelectedRecipient;
-            bool isPrivate = recipient is not null;
-
-            bool isOnline = isPrivate && FindOnlineUserIndex(recipient!) >= 0;
-            recipientLabel.Text = isPrivate ? (isOnline ? $"→ {recipient} (özel mesaj)" : $"→ {recipient} (çevrimdışı — mesaj bekletilir)") : "Herkese";
-            recipientLabel.ForeColor = isPrivate ? ClientConstants.PrivateMessageColor : SystemColors.GrayText;
-            clearRecipientButton.Visible = isPrivate;
-        }
-
-        protected override void OnFormClosing(FormClosingEventArgs e)
-        {
-            // Kapanırken arayüze event göndermeyi bırak, devam eden bağlantı denemesini iptal et.
-            _client.StateChanged -= OnStateChanged;
-            _client.Disconnected -= OnDisconnected;
-            _client.MessageReceived -= OnMessageReceived;
-            _lifetimeCts.Cancel();
-            _client.Dispose();
-            base.OnFormClosing(e);
-        }
-
-        private void OnStateChanged(object? sender, ConnectionState state)
-        {
-            if (!IsDisposed)
-            {
-                UpdateUiState(state);
-            }
-        }
-
-        private void OnMessageReceived(object? sender, ChatMessage message)
-        {
-            if (IsDisposed)
-            {
-                return;
-            }
-
-            switch (message.Type)
-            {
-                case MessageType.JoinAccepted:
-                    IReadOnlyList<string> users = message.Users ?? Array.Empty<string>();
-                    SetOnlineUsers(users);
-                    BeginHistorySession(_client.Username);
-                    _chatView.AppendSystem($"Sunucuya bağlandınız. Çevrimiçi: {string.Join(", ", users)}");
-                    break;
-                case MessageType.UserJoined when message.Sender is not null:
-                    AddOnlineUser(message.Sender);
-                    _chatView.AppendLine(message.Timestamp ?? DateTime.Now, $"{message.Sender} sohbete katıldı.", ClientConstants.SystemMessageColor);
-                    break;
-                case MessageType.UserLeft when message.Sender is not null:
-                    RemoveOnlineUser(message.Sender);
-                    _chatView.AppendLine(message.Timestamp ?? DateTime.Now, $"{message.Sender} sohbetten ayrıldı.", ClientConstants.SystemMessageColor);
-                    break;
-                case MessageType.PrivateQueued:
-                    ShowPrivate(message);
-                    _chatView.AppendSystem($"{message.Recipient} çevrimdışı; mesajınız, giriş yaptığında ona iletilecek.");
-                    break;
-                case MessageType.Private:
-                    ShowPrivate(message);
-                    break;
-                case MessageType.Chat:
-                    DateTime chatTime = message.Timestamp ?? DateTime.Now;
-                    string chatSender = message.Sender ?? "?";
-                    string chatText = message.Text ?? string.Empty;
-                    bool isOwn = UsernameValidator.Comparer.Equals(message.Sender, _client.Username);
-                    _chatView.AppendChat(chatTime, chatSender, chatText, isOwn);
-                    _ = SaveToHistoryAsync(chatTime, ChatHistoryStore.FormatChat(chatTime, chatSender, chatText));
-                    break;
-                case MessageType.ContactList:
-                    SetContacts(message.Contacts);
-                    break;
-                case MessageType.GroupList:
-                    SetGroups(message.Groups);
-                    break;
-                case MessageType.InviteList:
-                    SetInvites(message.Invites);
-                    break;
-                case MessageType.GroupMembers:
-                    SetGroupMembers(message.Recipient, message.Members);
-                    break;
-                case MessageType.GroupMessage:
-                    ShowGroupMessage(message);
-                    break;
-                case MessageType.InviteSent:
-                    _chatView.AppendSystem($"{message.Text} gruba davet edildi.");
-                    break;
-                case MessageType.Error:
-                    _chatView.AppendError(ErrorMessages.Describe(message.ErrorCode));
-                    break;
-            }
-        }
-
-        private void ShowPrivate(ChatMessage message)
-        {
-            DateTime time = message.Timestamp ?? DateTime.Now;
-            string sender = message.Sender ?? "?";
-            string recipient = message.Recipient ?? "?";
-            string text = message.Text ?? string.Empty;
-            bool isSentByMe = UsernameValidator.Comparer.Equals(message.Sender, _client.Username);
-            _chatView.AppendPrivate(time, sender, recipient, text, isSentByMe);
-            _ = SaveToHistoryAsync(time, ChatHistoryStore.FormatPrivate(time, sender, recipient, text, isSentByMe));
-        }
-
-        private void SetOnlineUsers(IEnumerable<string> users)
-        {
-            _isSyncingRecipient = true;
-            onlineListBox.BeginUpdate();
-            onlineListBox.Items.Clear();
-            foreach (string user in users)
-            {
-                onlineListBox.Items.Add(user);
-            }
-            onlineListBox.EndUpdate();
-            _isSyncingRecipient = false;
-            UpdateOnlineCount();
-            UpdateRecipientUi();
-        }
-
-        private void AddOnlineUser(string username)
-        {
-            if (FindOnlineUserIndex(username) < 0)
-            {
-                onlineListBox.Items.Add(username);
-                UpdateOnlineCount();
-                UpdateRecipientUi(); // seçili alıcı çevrimiçi olduysa etiket güncellensin
-            }
-        }
-
-        private void RemoveOnlineUser(string username)
-        {
-            int index = FindOnlineUserIndex(username);
-            if (index >= 0)
-            {
-                _isSyncingRecipient = true; // alıcı çevrimdışı olsa da seçili kalır; mesaj bekletilir
-                try { onlineListBox.Items.RemoveAt(index); } finally { _isSyncingRecipient = false; }
-                UpdateOnlineCount();
-                UpdateRecipientUi();
-            }
-        }
-
-        private int FindOnlineUserIndex(string username)
-        {
-            for (int i = 0; i < onlineListBox.Items.Count; i++)
-            {
-                if (UsernameValidator.Comparer.Equals(onlineListBox.Items[i] as string, username))
-                {
-                    return i;
-                }
-            }
-
-            return -1;
-        }
-
-        private void UpdateOnlineCount()
-        {
-            onlineTab.Text = $"Çevrimiçi ({onlineListBox.Items.Count})";
-            RefreshContactsList(); // kişilerin çevrimiçi durumu bu listeye bağlıdır
-        }
-
-        private void OnDisconnected(object? sender, DisconnectInfo info)
-        {
-            if (IsDisposed)
-            {
-                return;
-            }
-
-            _chosenRecipient = null;
-            _chosenGroupId = null;
-            SetOnlineUsers(Array.Empty<string>());
-            ClearContacts();
-            ClearGroups();
-            _history = null;
-
-            if (info.Reason == DisconnectReason.UserRequested)
-            {
-                _chatView.AppendSystem(info.Message);
-            }
-            else
-            {
-                _chatView.AppendError(info.Message);
-            }
         }
 
         private static string? ValidateLogin(string host, string username, string password)
@@ -391,37 +173,139 @@ namespace ChatClient
             return password.Length == 0 ? "Lütfen parolanızı girin." : null;
         }
 
+        // ---- bağlantı olayları ----
+
+        private void OnStateChanged(object? sender, ConnectionState state)
+        {
+            if (!IsDisposed)
+            {
+                UpdateUiState(state);
+            }
+        }
+
+        private void OnDisconnected(object? sender, DisconnectInfo info)
+        {
+            if (IsDisposed)
+            {
+                return;
+            }
+
+            EndSession();
+            loginErrorLabel.Text = info.Reason == DisconnectReason.UserRequested ? string.Empty : info.Message;
+            ClearNotice();
+        }
+
         private void UpdateUiState(ConnectionState state)
         {
             bool isDisconnected = state == ConnectionState.Disconnected;
-
-            hostTextBox.Enabled = isDisconnected;
-            portUpDown.Enabled = isDisconnected;
-            usernameTextBox.Enabled = isDisconnected;
-            passwordTextBox.Enabled = isDisconnected;
-            connectButton.Enabled = isDisconnected;
-            registerButton.Enabled = isDisconnected;
-            UpdateContactsUi(state == ConnectionState.Connected);
-            UpdateGroupButtons();
             bool isConnected = state == ConnectionState.Connected;
-            disconnectButton.Enabled = isConnected;
-            messageTextBox.Enabled = isConnected;
-            sendButton.Enabled = isConnected;
 
-            // Enter tuşu bağlı değilken Bağlan'a, bağlıyken Gönder'e basar.
-            AcceptButton = isConnected ? sendButton : connectButton;
-            if (isConnected)
+            hostTextBox.Enabled = portUpDown.Enabled = usernameTextBox.Enabled = passwordTextBox.Enabled = isDisconnected;
+            connectButton.Enabled = registerButton.Enabled = isDisconnected;
+
+            if (!isConnected)
             {
-                messageTextBox.Focus();
+                mainView.Visible = false;
+                loginView.Visible = true;
             }
 
+            messageTextBox.Enabled = sendButton.Enabled = isConnected;
             statusLabel.Text = state switch
             {
                 ConnectionState.Connecting => "Bağlanıyor...",
-                ConnectionState.Connected =>
-                    $"Bağlı — {_client.Username} (ID: {_client.UserId}) @ {hostTextBox.Text.Trim()}:{(int)portUpDown.Value}",
+                ConnectionState.Connected => $"Bağlı — {hostTextBox.Text.Trim()}:{(int)portUpDown.Value}",
                 _ => "Bağlı değil"
             };
+        }
+
+        // ---- sunucudan gelen iletiler ----
+
+        private void OnMessageReceived(object? sender, ChatMessage message)
+        {
+            if (IsDisposed)
+            {
+                return;
+            }
+
+            switch (message.Type)
+            {
+                case MessageType.JoinAccepted:
+                    BeginSession(message);
+                    break;
+                case MessageType.UserJoined when message.Sender is not null:
+                    SetPresence(message.Sender, isOnline: true);
+                    break;
+                case MessageType.UserLeft when message.Sender is not null:
+                    SetPresence(message.Sender, isOnline: false);
+                    break;
+                case MessageType.PresenceList:
+                    ReplacePresence(message.Users ?? Array.Empty<string>());
+                    break;
+                case MessageType.Private or MessageType.PrivateQueued:
+                    HandlePrivateMessage(message);
+                    break;
+                case MessageType.GroupMessage:
+                    HandleGroupMessage(message);
+                    break;
+                case MessageType.ContactList:
+                    SetContacts(message.Contacts);
+                    break;
+                case MessageType.GroupList:
+                    SetGroups(message.Groups);
+                    break;
+                case MessageType.InviteList:
+                    SetInvites(message.Invites);
+                    break;
+                case MessageType.GroupMembers:
+                    SetGroupMembers(message.Recipient, message.Members);
+                    break;
+                case MessageType.UserFound:
+                    OnUserFound(message);
+                    break;
+                case MessageType.InviteSent:
+                    ShowStatus($"{message.Text} gruba davet edildi.", isError: false);
+                    break;
+                case MessageType.Error:
+                    _pendingOpenAfterAdd = null;
+                    ShowStatus(ErrorMessages.Describe(message.ErrorCode), isError: true);
+                    break;
+            }
+        }
+
+        // ---- bildirimler ----
+
+        /// <summary>
+        /// Kısa bildirim: açık bir iletişim penceresi varsa orada, yoksa durum çubuğunda gösterilir
+        /// (modal pencere açıkken ana penceredeki bildirim görünmez kalırdı).
+        /// </summary>
+        private void ShowStatus(string text, bool isError)
+        {
+            if (_settingsDialog is not null)
+            {
+                _settingsDialog.ShowStatus(text, isError);
+            }
+            else if (_invitesDialog is not null)
+            {
+                _invitesDialog.ShowStatus(text, isError);
+            }
+            else
+            {
+                ShowNotice(text, isError);
+            }
+        }
+
+        private void ShowNotice(string text, bool isError = false)
+        {
+            noticeLabel.Text = text;
+            noticeLabel.ForeColor = isError ? Theme.ErrorText : Theme.Muted;
+            _noticeTimer.Stop();
+            _noticeTimer.Start();
+        }
+
+        private void ClearNotice()
+        {
+            _noticeTimer.Stop();
+            noticeLabel.Text = string.Empty;
         }
     }
 }

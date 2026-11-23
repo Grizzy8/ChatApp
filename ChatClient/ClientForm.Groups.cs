@@ -2,42 +2,9 @@ using ChatShared;
 
 namespace ChatClient
 {
-    // "Gruplar" ve "Davetler" sekmeleri: grup kurma, davet, üye yönetimi ve grup mesajı hedefi.
-    // Yetkiler sunucuda da denetlenir; buradaki düğme durumları yalnızca kullanıcıya yol göstermek içindir.
+    // Gruplar ve davetler. Yetkiler sunucuda da denetlenir; arayüzdeki düğme durumları yalnızca yol göstericidir.
     public partial class ClientForm
     {
-        private readonly TabPage groupsTab = new() { Text = "Gruplar (0)", Padding = new Padding(6), UseVisualStyleBackColor = true };
-        private readonly TabPage invitesTab = new() { Text = "Davetler (0)", Padding = new Padding(6), UseVisualStyleBackColor = true };
-
-        private readonly ListBox groupsListBox = NewList();
-        private readonly ListBox membersListBox = NewList();
-        private readonly ListBox invitesListBox = NewList();
-
-        private readonly TextBox newGroupTextBox = new()
-        {
-            Anchor = AnchorStyles.Left | AnchorStyles.Right,
-            PlaceholderText = "Yeni grup adı",
-            MaxLength = ProtocolConstants.GroupNameMaxLength
-        };
-
-        private readonly TextBox inviteTextBox = new()
-        {
-            Anchor = AnchorStyles.Left | AnchorStyles.Right,
-            PlaceholderText = "Davet: kullanıcı adı veya ID",
-            MaxLength = ProtocolConstants.MaxContactQueryLength
-        };
-
-        private readonly Button createGroupButton = NewContactButton("Grup kur");
-        private readonly Button inviteButton = NewContactButton("Davet et");
-        private readonly Button writeToGroupButton = NewContactButton("Gruba yaz");
-        private readonly Button removeMemberButton = NewContactButton("Üyeyi çıkar");
-        private readonly Button toggleAdminButton = NewContactButton("Yönetici yap");
-        private readonly Button leaveGroupButton = NewContactButton("Gruptan ayrıl");
-        private readonly Button deleteGroupButton = NewContactButton("Grubu sil");
-        private readonly Button renameGroupButton = NewContactButton("Adı değiştir");
-        private readonly Button acceptInviteButton = NewContactButton("Kabul et");
-        private readonly Button declineInviteButton = NewContactButton("Reddet");
-
         private IReadOnlyList<GroupInfo> _groups = Array.Empty<GroupInfo>();
         private IReadOnlyList<GroupInviteInfo> _invites = Array.Empty<GroupInviteInfo>();
         private readonly Dictionary<string, IReadOnlyList<GroupMemberInfo>> _groupMembers = new();
@@ -46,258 +13,95 @@ namespace ChatClient
         private bool _hasReceivedGroups;
         private bool _hasReceivedInvites;
 
-        // Grup mesajının hedefi; kişi hedefiyle (_chosenRecipient) aynı anda yalnızca biri dolu olur.
-        private string? _chosenGroupId;
+        // Kurduğumuz ya da davetini kabul ettiğimiz grup listede belirince sohbeti otomatik açılır.
+        private bool _openNextAddedGroup;
 
-        // Üyeler listesinde şu an hangi grubun üyelerinin gösterildiği.
-        private string? _shownMembersGroupId;
+        private GroupSettingsDialog? _settingsDialog;
+        private InvitesDialog? _invitesDialog;
 
-        private sealed record GroupListItem(GroupInfo Group)
+        private void InitializeGroups()
         {
-            public override string ToString() => $"{Group.Name}  ·  {RoleNames.Describe(Group.Role)}";
-        }
-
-        private sealed record MemberListItem(GroupMemberInfo Member)
-        {
-            public override string ToString() => $"{Member.Username}  ·  {RoleNames.Describe(Member.Role)}";
-        }
-
-        private sealed record InviteListItem(GroupInviteInfo Invite)
-        {
-            public override string ToString() => $"{Invite.GroupName}  ←  {Invite.InviterUsername}";
-        }
-
-        private static ListBox NewList() => new() { Dock = DockStyle.Fill, IntegralHeight = false, BorderStyle = BorderStyle.FixedSingle };
-
-        private GroupInfo? SelectedGroup => (groupsListBox.SelectedItem as GroupListItem)?.Group;
-
-        private GroupMemberInfo? SelectedMember => (membersListBox.SelectedItem as MemberListItem)?.Member;
-
-        private string GroupNameOf(string groupId) => _groups.FirstOrDefault(g => g.Id == groupId)?.Name ?? "Grup";
-
-        private void InitializeGroupsTab()
-        {
-            groupsTab.Controls.Add(BuildGroupsLayout());
-            invitesTab.Controls.Add(BuildInvitesLayout());
-            sideTabs.TabPages.Add(groupsTab);
-            sideTabs.TabPages.Add(invitesTab);
-
-            createGroupButton.Click += async (_, _) => await CreateGroupAsync();
-            newGroupTextBox.KeyDown += (_, e) => SubmitOnEnter(e, () => _ = CreateGroupAsync());
-            inviteButton.Click += async (_, _) => await InviteAsync();
-            inviteTextBox.KeyDown += (_, e) => SubmitOnEnter(e, () => _ = InviteAsync());
-            writeToGroupButton.Click += (_, _) => TargetSelectedGroup();
-            groupsListBox.DoubleClick += (_, _) => TargetSelectedGroup();
-            removeMemberButton.Click += async (_, _) => await RunMemberActionAsync((g, m) => _client.RemoveMemberAsync(g.Id, m.UserId));
-            toggleAdminButton.Click += async (_, _) => await RunMemberActionAsync((g, m) => m.Role == GroupRole.Admin
-                ? _client.DemoteMemberAsync(g.Id, m.UserId)
-                : _client.PromoteMemberAsync(g.Id, m.UserId));
-            renameGroupButton.Click += async (_, _) => await RenameSelectedGroupAsync();
-            leaveGroupButton.Click += async (_, _) => await RunGroupActionAsync(g => _client.LeaveGroupAsync(g.Id));
-            deleteGroupButton.Click += OnDeleteGroupClick;
-            acceptInviteButton.Click += async (_, _) => await RunInviteActionAsync(i => _client.AcceptInviteAsync(i.GroupId));
-            declineInviteButton.Click += async (_, _) => await RunInviteActionAsync(i => _client.DeclineInviteAsync(i.GroupId));
-            groupsListBox.SelectedIndexChanged += OnSelectedGroupChanged;
-            membersListBox.SelectedIndexChanged += (_, _) => UpdateGroupButtons();
-            invitesListBox.SelectedIndexChanged += (_, _) => UpdateGroupButtons();
-        }
-
-        private Control BuildGroupsLayout()
-        {
-            var root = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 1, RowCount = 4 };
-            root.RowStyles.Add(new RowStyle(SizeType.Percent, 40));
-            root.RowStyles.Add(new RowStyle(SizeType.AutoSize));
-            root.RowStyles.Add(new RowStyle(SizeType.Percent, 60));
-            root.RowStyles.Add(new RowStyle(SizeType.AutoSize));
-
-            var membersLabel = new Label { Text = "Seçili grubun üyeleri", AutoSize = true, ForeColor = SystemColors.GrayText, Margin = new Padding(3, 6, 3, 2) };
-
-            var inputs = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 2, AutoSize = true, Margin = new Padding(0, 6, 0, 0) };
-            inputs.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
-            inputs.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
-            inputs.Controls.Add(newGroupTextBox, 0, 0);
-            inputs.Controls.Add(createGroupButton, 1, 0);
-            inputs.Controls.Add(inviteTextBox, 0, 1);
-            inputs.Controls.Add(inviteButton, 1, 1);
-
-            var actions = new FlowLayoutPanel { Dock = DockStyle.Fill, AutoSize = true, WrapContents = true, Margin = new Padding(0) };
-            foreach (Button button in new[] { writeToGroupButton, removeMemberButton, toggleAdminButton, renameGroupButton, leaveGroupButton, deleteGroupButton })
-            {
-                button.Anchor = AnchorStyles.None;
-                button.Margin = new Padding(0, 0, 4, 2);
-                actions.Controls.Add(button);
-            }
-
-            var bottom = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 1, AutoSize = true };
-            bottom.Controls.Add(inputs, 0, 0);
-            bottom.Controls.Add(actions, 0, 1);
-
-            var membersBlock = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 1, RowCount = 2 };
-            membersBlock.RowStyles.Add(new RowStyle(SizeType.AutoSize));
-            membersBlock.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
-            membersBlock.Controls.Add(membersLabel, 0, 0);
-            membersBlock.Controls.Add(membersListBox, 0, 1);
-
-            root.Controls.Add(groupsListBox, 0, 0);
-            root.Controls.Add(membersBlock, 0, 1);
-            root.SetRowSpan(membersBlock, 2);
-            root.Controls.Add(bottom, 0, 3);
-            return root;
-        }
-
-        private Control BuildInvitesLayout()
-        {
-            var buttons = new TableLayoutPanel { Dock = DockStyle.Bottom, ColumnCount = 2, AutoSize = true, Padding = new Padding(0, 6, 0, 0) };
-            buttons.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50));
-            buttons.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50));
-            buttons.Controls.Add(acceptInviteButton, 0, 0);
-            buttons.Controls.Add(declineInviteButton, 1, 0);
-
-            var panel = new Panel { Dock = DockStyle.Fill };
-            panel.Controls.Add(invitesListBox);
-            panel.Controls.Add(buttons);
-            return panel;
-        }
-
-        private static void SubmitOnEnter(KeyEventArgs e, Action submit)
-        {
-            if (e.KeyCode == Keys.Enter)
-            {
-                e.SuppressKeyPress = true; // Enter, varsayılan düğmeyi (Gönder) tetiklemesin
-                submit();
-            }
+            newGroupButton.Click += async (_, _) => await CreateGroupAsync();
+            invitesButton.Click += (_, _) => ShowInvites();
         }
 
         // ---- kullanıcı eylemleri ----
 
         private async Task CreateGroupAsync()
         {
-            string name = newGroupTextBox.Text.Trim();
-            if (name.Length == 0)
-            {
-                newGroupTextBox.Focus();
-                return;
-            }
-
-            newGroupTextBox.Clear();
-            if (!await _client.CreateGroupAsync(name) && !IsDisposed)
-            {
-                newGroupTextBox.Text = name; // gönderilemedi: metin kaybolmasın
-            }
-        }
-
-        private async Task InviteAsync()
-        {
-            GroupInfo? group = SelectedGroup;
-            string query = inviteTextBox.Text.Trim();
-            if (group is null || query.Length == 0)
-            {
-                inviteTextBox.Focus();
-                return;
-            }
-
-            inviteTextBox.Clear();
-            if (!await _client.InviteToGroupAsync(group.Id, query) && !IsDisposed)
-            {
-                inviteTextBox.Text = query;
-            }
-        }
-
-        private async Task RunMemberActionAsync(Func<GroupInfo, GroupMemberInfo, Task<bool>> action)
-        {
-            if (SelectedGroup is { } group && SelectedMember is { } member)
-            {
-                await action(group, member);
-            }
-        }
-
-        private async Task RunGroupActionAsync(Func<GroupInfo, Task<bool>> action)
-        {
-            if (SelectedGroup is { } group)
-            {
-                await action(group);
-            }
-        }
-
-        private async Task RunInviteActionAsync(Func<GroupInviteInfo, Task<bool>> action)
-        {
-            if ((invitesListBox.SelectedItem as InviteListItem)?.Invite is { } invite)
-            {
-                await action(invite);
-            }
-        }
-
-        // Yeni ad, "Yeni grup adı" kutusundan alınır (grup kurmak için de aynı kutu kullanılır).
-        private async Task RenameSelectedGroupAsync()
-        {
-            string name = newGroupTextBox.Text.Trim();
-            if (SelectedGroup is not { } group || name.Length == 0)
-            {
-                newGroupTextBox.Focus();
-                return;
-            }
-
-            newGroupTextBox.Clear();
-            if (!await _client.RenameGroupAsync(group.Id, name) && !IsDisposed)
-            {
-                newGroupTextBox.Text = name;
-            }
-        }
-
-        private async void OnDeleteGroupClick(object? sender, EventArgs e)
-        {
-            if (SelectedGroup is not { } group)
+            string? name = Dialogs.Prompt(this, "Yeni grup", "Grup adı", string.Empty, ProtocolConstants.GroupNameMaxLength, "Oluştur");
+            if (name is null)
             {
                 return;
             }
 
-            DialogResult answer = MessageBox.Show(this,
-                $"\"{group.Name}\" grubu tüm üyeleri için silinecek. Bu işlem geri alınamaz. Devam edilsin mi?",
-                "Grubu sil", MessageBoxButtons.YesNo, MessageBoxIcon.Warning, MessageBoxDefaultButton.Button2);
-            if (answer == DialogResult.Yes)
+            _openNextAddedGroup = true;
+            if (!await _client.CreateGroupAsync(name))
             {
-                await _client.DeleteGroupAsync(group.Id);
+                _openNextAddedGroup = false;
             }
         }
 
-        private void TargetSelectedGroup()
+        private void ShowInvites()
         {
-            if (SelectedGroup is not { } group)
+            if (_invitesDialog is not null)
             {
                 return;
             }
 
-            _isSyncingRecipient = true;
-            try { onlineListBox.ClearSelected(); } finally { _isSyncingRecipient = false; }
-
-            _chosenRecipient = null;
-            _chosenGroupId = group.Id;
-            UpdateRecipientUi();
-            messageTextBox.Focus();
+            using var dialog = new InvitesDialog(_invites, AcceptInviteAsync, invite => _client.DeclineInviteAsync(invite.GroupId));
+            _invitesDialog = dialog;
+            try
+            {
+                dialog.ShowDialog(this);
+            }
+            finally
+            {
+                _invitesDialog = null;
+            }
         }
 
-        private void OnSelectedGroupChanged(object? sender, EventArgs e)
+        private async Task<bool> AcceptInviteAsync(GroupInviteInfo invite)
         {
-            // Üye listesi yalnızca gösterilen grup değişince sıfırlanır; aynı grubun liste güncellemelerinde üye seçimi korunur.
-            string? groupId = SelectedGroup?.Id;
-            if (groupId != _shownMembersGroupId)
+            _openNextAddedGroup = true;
+            bool sent = await _client.AcceptInviteAsync(invite.GroupId);
+            if (!sent)
             {
-                _shownMembersGroupId = groupId;
-                membersListBox.Items.Clear();
-                if (groupId is not null)
-                {
-                    if (_groupMembers.TryGetValue(groupId, out IReadOnlyList<GroupMemberInfo>? cached))
-                    {
-                        FillMembers(cached);
-                    }
-                    else
-                    {
-                        _ = _client.RequestGroupMembersAsync(groupId);
-                    }
-                }
+                _openNextAddedGroup = false;
             }
 
-            UpdateGroupButtons();
+            return sent;
+        }
+
+        private void OpenCurrentGroupSettings()
+        {
+            if (_current?.GroupId is not { } groupId || _settingsDialog is not null)
+            {
+                return;
+            }
+
+            GroupInfo? group = _groups.FirstOrDefault(g => g.Id == groupId);
+            if (group is null)
+            {
+                return;
+            }
+
+            if (!_groupMembers.ContainsKey(groupId))
+            {
+                _ = _client.RequestGroupMembersAsync(groupId);
+            }
+
+            using var dialog = new GroupSettingsDialog(
+                _client, group, _groupMembers.GetValueOrDefault(groupId) ?? Array.Empty<GroupMemberInfo>(), IsOnline);
+            _settingsDialog = dialog;
+            try
+            {
+                dialog.ShowDialog(this);
+            }
+            finally
+            {
+                _settingsDialog = null;
+            }
         }
 
         // ---- sunucudan gelen durum ----
@@ -305,8 +109,9 @@ namespace ChatClient
         private void SetGroups(IReadOnlyList<GroupInfo>? groups)
         {
             IReadOnlyList<GroupInfo> updated = groups ?? Array.Empty<GroupInfo>();
+            bool isFirstList = !_hasReceivedGroups;
 
-            if (_hasReceivedGroups)
+            if (!isFirstList)
             {
                 AnnounceGroupChanges(_groups, updated);
             }
@@ -314,44 +119,89 @@ namespace ChatClient
             _groups = updated;
             _hasReceivedGroups = true;
 
-            foreach (string gone in _groupMembers.Keys.Where(id => updated.All(g => g.Id != id)).ToList())
-            {
-                _groupMembers.Remove(gone);
-            }
+            var ids = updated.Select(g => g.Id).ToHashSet();
+            RemoveVanishedGroups(ids);
 
-            if (_chosenGroupId is not null && updated.All(g => g.Id != _chosenGroupId))
-            {
-                _chosenGroupId = null; // hedef grup artık yok
-            }
-
-            string? selectedId = SelectedGroup?.Id;
-            groupsListBox.BeginUpdate();
-            groupsListBox.Items.Clear();
+            Conversation? toOpen = null;
             foreach (GroupInfo group in updated)
             {
-                int index = groupsListBox.Items.Add(new GroupListItem(group));
-                if (group.Id == selectedId)
+                string key = ConversationKey.ForGroup(group.Id);
+                if (_conversations.TryGetValue(key, out Conversation? existing))
                 {
-                    groupsListBox.SelectedIndex = index;
+                    existing.Title = group.Name;
+                    continue;
+                }
+
+                StoredConversation? stored = _storedIndex.FirstOrDefault(s => s.Key == key);
+                var created = new Conversation(key, ConversationKind.Group, group.Name, group.Id)
+                {
+                    // Girişteki ilk listede mesajsız gruplar altta kalır; oturum sırasında katılınan grup en üste çıkar.
+                    LastActivity = stored?.LastTime ?? (isFirstList ? DateTime.MinValue : DateTime.Now),
+                    Unread = stored?.Unread ?? 0
+                };
+                _conversations[key] = created;
+
+                if (_openNextAddedGroup && !isFirstList)
+                {
+                    toOpen = created;
+                    _openNextAddedGroup = false;
                 }
             }
-            groupsListBox.EndUpdate();
 
-            groupsTab.Text = $"Gruplar ({updated.Count})";
-            OnSelectedGroupChanged(this, EventArgs.Empty);
-            UpdateRecipientUi();
+            if (_settingsDialog is { } dialog)
+            {
+                GroupInfo? shown = updated.FirstOrDefault(g => g.Id == dialog.GroupId);
+                if (shown is null)
+                {
+                    dialog.Close();
+                }
+                else
+                {
+                    dialog.Refresh(shown, _groupMembers.GetValueOrDefault(shown.Id) ?? Array.Empty<GroupMemberInfo>());
+                }
+            }
+
+            RefreshConversationList();
+            RebuildSearch();
+            if (toOpen is not null)
+            {
+                OpenConversation(toOpen);
+            }
+            else
+            {
+                UpdateHeader();
+                UpdateMembersPanel();
+            }
+        }
+
+        private void RemoveVanishedGroups(HashSet<string> currentIds)
+        {
+            foreach (Conversation gone in _conversations.Values.Where(c => c.IsGroup && !currentIds.Contains(c.GroupId!)).ToList())
+            {
+                _conversations.Remove(gone.Key);
+                if (_current == gone)
+                {
+                    _current = null;
+                    ShowNoConversation();
+                }
+            }
+
+            foreach (string id in _groupMembers.Keys.Where(id => !currentIds.Contains(id)).ToList())
+            {
+                _groupMembers.Remove(id);
+            }
         }
 
         private void AnnounceGroupChanges(IReadOnlyList<GroupInfo> before, IReadOnlyList<GroupInfo> after)
         {
             foreach (GroupInfo added in after.Where(a => before.All(b => b.Id != a.Id)))
             {
-                _chatView.AppendSystem($"\"{added.Name}\" grubuna katıldınız ({RoleNames.Describe(added.Role)}).");
+                ShowNotice($"\"{added.Name}\" grubuna katıldınız ({RoleNames.Describe(added.Role)}).");
             }
 
             foreach (GroupInfo removed in before.Where(b => after.All(a => a.Id != b.Id)))
             {
-                _chatView.AppendSystem($"\"{removed.Name}\" grubundan ayrıldınız ya da çıkarıldınız (grup silinmiş de olabilir).");
+                ShowNotice($"\"{removed.Name}\" grubundan ayrıldınız ya da çıkarıldınız (grup silinmiş de olabilir).");
             }
 
             foreach (GroupInfo changed in after)
@@ -359,12 +209,11 @@ namespace ChatClient
                 GroupInfo? old = before.FirstOrDefault(b => b.Id == changed.Id);
                 if (old is not null && old.Name != changed.Name)
                 {
-                    _chatView.AppendSystem($"\"{old.Name}\" grubunun adı \"{changed.Name}\" oldu.");
+                    ShowNotice($"\"{old.Name}\" grubunun adı \"{changed.Name}\" oldu.");
                 }
-
-                if (old is not null && old.Role != changed.Role)
+                else if (old is not null && old.Role != changed.Role)
                 {
-                    _chatView.AppendSystem($"\"{changed.Name}\" grubundaki rolünüz: {RoleNames.Describe(changed.Role)}.");
+                    ShowNotice($"\"{changed.Name}\" grubundaki rolünüz: {RoleNames.Describe(changed.Role)}.");
                 }
             }
         }
@@ -377,35 +226,29 @@ namespace ChatClient
             {
                 if (updated.Count > 0)
                 {
-                    _chatView.AppendSystem($"{updated.Count} bekleyen grup davetiniz var. Davetler sekmesinden yanıtlayabilirsiniz.");
+                    ShowNotice($"{updated.Count} bekleyen grup davetiniz var.");
                 }
             }
             else
             {
                 foreach (GroupInviteInfo added in updated.Where(a => _invites.All(b => b.GroupId != a.GroupId)))
                 {
-                    _chatView.AppendSystem($"{added.InviterUsername} sizi \"{added.GroupName}\" grubuna davet etti. Davetler sekmesinden yanıtlayabilirsiniz.");
+                    ShowNotice($"{added.InviterUsername} sizi \"{added.GroupName}\" grubuna davet etti.");
                 }
             }
 
             _invites = updated;
             _hasReceivedInvites = true;
+            UpdateInvitesButton();
+            _invitesDialog?.SetInvites(updated);
+        }
 
-            string? selectedId = (invitesListBox.SelectedItem as InviteListItem)?.Invite.GroupId;
-            invitesListBox.BeginUpdate();
-            invitesListBox.Items.Clear();
-            foreach (GroupInviteInfo invite in updated)
-            {
-                int index = invitesListBox.Items.Add(new InviteListItem(invite));
-                if (invite.GroupId == selectedId)
-                {
-                    invitesListBox.SelectedIndex = index;
-                }
-            }
-            invitesListBox.EndUpdate();
-
-            invitesTab.Text = $"Davetler ({updated.Count})";
-            UpdateGroupButtons();
+        private void UpdateInvitesButton()
+        {
+            bool hasInvites = _invites.Count > 0;
+            invitesButton.Text = hasInvites ? $"Davetler ({_invites.Count})" : "Davetler";
+            invitesButton.BackColor = hasInvites ? Theme.Accent : Theme.Input;
+            invitesButton.FlatAppearance.MouseOverBackColor = hasInvites ? Theme.AccentHover : Theme.Selected;
         }
 
         private void SetGroupMembers(string? groupId, IReadOnlyList<GroupMemberInfo>? members)
@@ -416,39 +259,18 @@ namespace ChatClient
             }
 
             _groupMembers[groupId] = members;
-            if (SelectedGroup?.Id == groupId)
+
+            if (_current?.GroupId == groupId)
             {
-                FillMembers(members);
+                UpdateHeader();
+                UpdateMembersPanel();
             }
-        }
 
-        private void FillMembers(IReadOnlyList<GroupMemberInfo> members)
-        {
-            string? selectedId = SelectedMember?.UserId;
-            membersListBox.BeginUpdate();
-            membersListBox.Items.Clear();
-            foreach (GroupMemberInfo member in members)
+            if (_settingsDialog is { } dialog && dialog.GroupId == groupId
+                && _groups.FirstOrDefault(g => g.Id == groupId) is { } group)
             {
-                int index = membersListBox.Items.Add(new MemberListItem(member));
-                if (member.UserId == selectedId)
-                {
-                    membersListBox.SelectedIndex = index;
-                }
+                dialog.Refresh(group, members);
             }
-            membersListBox.EndUpdate();
-            UpdateGroupButtons();
-        }
-
-        private void ShowGroupMessage(ChatMessage message)
-        {
-            DateTime time = message.Timestamp ?? DateTime.Now;
-            string sender = message.Sender ?? "?";
-            string text = message.Text ?? string.Empty;
-            string groupName = GroupNameOf(message.Recipient ?? string.Empty);
-            bool isOwn = UsernameValidator.Comparer.Equals(message.Sender, _client.Username);
-
-            _chatView.AppendGroup(time, groupName, sender, text, isOwn);
-            _ = SaveToHistoryAsync(time, ChatHistoryStore.FormatGroup(time, groupName, sender, text));
         }
 
         private void ClearGroups()
@@ -458,39 +280,8 @@ namespace ChatClient
             _groupMembers.Clear();
             _hasReceivedGroups = false;
             _hasReceivedInvites = false;
-            _shownMembersGroupId = null;
-            groupsListBox.Items.Clear();
-            membersListBox.Items.Clear();
-            invitesListBox.Items.Clear();
-            groupsTab.Text = "Gruplar (0)";
-            invitesTab.Text = "Davetler (0)";
-            UpdateGroupButtons();
-        }
-
-        /// <summary>Düğmeleri rol kurallarına göre açar/kapatır (sunucu yine de her isteği denetler).</summary>
-        private void UpdateGroupButtons()
-        {
-            bool connected = _client.State == ConnectionState.Connected;
-            GroupInfo? group = SelectedGroup;
-            GroupMemberInfo? member = SelectedMember;
-            bool isOther = member is not null && member.UserId != _client.UserId;
-
-            createGroupButton.Enabled = connected;
-            newGroupTextBox.Enabled = connected;
-            inviteTextBox.Enabled = connected && group is not null && GroupPermissions.CanInvite(group.Role);
-            inviteButton.Enabled = inviteTextBox.Enabled;
-            writeToGroupButton.Enabled = connected && group is not null;
-            removeMemberButton.Enabled = connected && group is not null && isOther && GroupPermissions.CanRemove(group.Role, member!.Role);
-            toggleAdminButton.Enabled = connected && group is not null && isOther
-                && GroupPermissions.CanChangeRoles(group.Role) && member!.Role != GroupRole.Owner;
-            toggleAdminButton.Text = member?.Role == GroupRole.Admin ? "Yöneticiliği al" : "Yönetici yap";
-            renameGroupButton.Enabled = connected && group is not null && GroupPermissions.CanRename(group.Role);
-            leaveGroupButton.Enabled = connected && group is not null && GroupPermissions.CanLeave(group.Role);
-            deleteGroupButton.Enabled = connected && group is not null && GroupPermissions.CanDeleteGroup(group.Role);
-
-            bool hasInvite = connected && invitesListBox.SelectedItem is not null;
-            acceptInviteButton.Enabled = hasInvite;
-            declineInviteButton.Enabled = hasInvite;
+            _openNextAddedGroup = false;
+            UpdateInvitesButton();
         }
     }
 }

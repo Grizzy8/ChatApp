@@ -137,14 +137,7 @@ public sealed class ChatClientService : IDisposable
         }
     }
 
-    /// <summary>
-    /// Genel sohbete mesaj gönderir. Bağlı değilse veya gönderme başarısız olursa false döner;
-    /// gönderme hatası bağlantının koptuğu anlamına gelir ve Disconnected olayı tetiklenir.
-    /// </summary>
-    public Task<bool> SendChatAsync(string text, CancellationToken cancellationToken = default) =>
-        SendMessageAsync(new ChatMessage(MessageType.Chat, Text: text), cancellationToken);
-
-    /// <summary>Belirtilen kullanıcıya özel mesaj gönderir. Dönüş değeri SendChatAsync ile aynı anlamdadır.</summary>
+    /// <summary>Belirtilen kullanıcıya özel mesaj gönderir. Bağlı değilse veya gönderme başarısız olursa false döner; gönderme hatası bağlantının koptuğu anlamına gelir ve Disconnected olayı tetiklenir.</summary>
     public Task<bool> SendPrivateAsync(string recipient, string text, CancellationToken cancellationToken = default)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(recipient);
@@ -153,7 +146,7 @@ public sealed class ChatClientService : IDisposable
 
     /// <summary>
     /// Kullanıcı adı ya da ID ile kişi ekletir. Sonuç, sunucudan gelen ContactList (başarı) veya Error (hata)
-    /// mesajıyla MessageReceived olayında iletilir. Dönüş değeri SendChatAsync ile aynı anlamdadır.
+    /// mesajıyla MessageReceived olayında iletilir. Bağlı değilse veya gönderme başarısız olursa false döner; gönderme hatası bağlantının koptuğu anlamına gelir ve Disconnected olayı tetiklenir.
     /// </summary>
     public Task<bool> AddContactAsync(string usernameOrId, CancellationToken cancellationToken = default)
     {
