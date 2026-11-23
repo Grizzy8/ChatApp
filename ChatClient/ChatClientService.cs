@@ -124,10 +124,20 @@ public sealed class ChatClientService : IDisposable
     /// Genel sohbete mesaj gönderir. Bağlı değilse veya gönderme başarısız olursa false döner;
     /// gönderme hatası bağlantının koptuğu anlamına gelir ve Disconnected olayı tetiklenir.
     /// </summary>
-    public async Task<bool> SendChatAsync(string text, CancellationToken cancellationToken = default)
+    public Task<bool> SendChatAsync(string text, CancellationToken cancellationToken = default) =>
+        SendMessageAsync(new ChatMessage(MessageType.Chat, Text: text), cancellationToken);
+
+    /// <summary>Belirtilen kullanıcıya özel mesaj gönderir. Dönüş değeri SendChatAsync ile aynı anlamdadır.</summary>
+    public Task<bool> SendPrivateAsync(string recipient, string text, CancellationToken cancellationToken = default)
     {
-        ArgumentException.ThrowIfNullOrWhiteSpace(text);
-        ArgumentOutOfRangeException.ThrowIfGreaterThan(text.Length, ProtocolConstants.MaxMessageLength);
+        ArgumentException.ThrowIfNullOrWhiteSpace(recipient);
+        return SendMessageAsync(new ChatMessage(MessageType.Private, Recipient: recipient, Text: text), cancellationToken);
+    }
+
+    private async Task<bool> SendMessageAsync(ChatMessage message, CancellationToken cancellationToken)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(message.Text);
+        ArgumentOutOfRangeException.ThrowIfGreaterThan(message.Text.Length, ProtocolConstants.MaxMessageLength);
 
         MessageChannel? channel;
         lock (_gate)
@@ -142,7 +152,7 @@ public sealed class ChatClientService : IDisposable
 
         try
         {
-            await channel.SendAsync(new ChatMessage(MessageType.Chat, Text: text), cancellationToken).ConfigureAwait(false);
+            await channel.SendAsync(message, cancellationToken).ConfigureAwait(false);
             return true;
         }
         catch (OperationCanceledException)

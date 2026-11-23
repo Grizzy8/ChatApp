@@ -25,6 +25,19 @@ public sealed class ClientRegistry
         return true;
     }
 
+    /// <summary>Katılımı tamamlanmış (aktif) bir kullanıcının oturumunu bulur; ad büyük/küçük harf duyarsızdır.</summary>
+    public bool TryGetActive(string username, out ClientSession session)
+    {
+        if (_sessions.TryGetValue(username, out ClientSession? found) && found.IsActive)
+        {
+            session = found;
+            return true;
+        }
+
+        session = null!;
+        return false;
+    }
+
     /// <summary>Oturum kayıtlıysa çıkarır. Yalnızca bu oturuma ait kayıt silinir.</summary>
     public bool Remove(ClientSession session)
     {

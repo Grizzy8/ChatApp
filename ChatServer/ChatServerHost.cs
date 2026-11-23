@@ -330,6 +330,9 @@ public sealed class ChatServerHost : IDisposable
             case MessageType.Chat:
                 await HandleChatAsync(session, message, token).ConfigureAwait(false);
                 break;
+            case MessageType.Private:
+                await HandlePrivateAsync(session, message, token).ConfigureAwait(false);
+                break;
             default:
                 WriteLog($"{session.Username} geçersiz mesaj türü gönderdi ({message.Type}), yok sayıldı.", ServerLogLevel.Error);
                 break;
@@ -339,27 +342,75 @@ public sealed class ChatServerHost : IDisposable
     /// <summary>Genel sohbet mesajını doğrular ve herkese iletir. Gönderen adı istemciden değil, oturumdan alınır.</summary>
     private async Task HandleChatAsync(ClientSession session, ChatMessage message, CancellationToken token)
     {
-        string? text = message.Text;
-
-        if (string.IsNullOrWhiteSpace(text))
+        ErrorCode problem = ValidateMessageText(message.Text);
+        if (problem != ErrorCode.None)
         {
-            await SendErrorAsync(session, ErrorCode.InvalidMessage, token).ConfigureAwait(false);
+            await RejectMessageAsync(session, problem, token).ConfigureAwait(false);
             return;
         }
 
-        if (text.Length > ProtocolConstants.MaxMessageLength)
-        {
-            await SendErrorAsync(session, ErrorCode.MessageTooLong, token).ConfigureAwait(false);
-            WriteLog($"{session.Username} çok uzun bir mesaj gönderdi ({text.Length} karakter), reddedildi.", ServerLogLevel.Error);
-            return;
-        }
+        WriteLog($"{session.Username}: {message.Text}");
 
-        WriteLog($"{session.Username}: {text}");
-
-        var broadcast = new ChatMessage(MessageType.Chat, Sender: session.Username, Text: text, Timestamp: DateTime.Now);
+        var broadcast = new ChatMessage(MessageType.Chat, Sender: session.Username, Text: message.Text, Timestamp: DateTime.Now);
         await _router.BroadcastAsync(broadcast, token).ConfigureAwait(false);
     }
 
+    /// <summary>
+    /// Özel mesajı yalnızca alıcıya ve göndericiye iletir. İçerik, gizlilik için sunucu log'una yazılmaz.
+    /// </summary>
+    private async Task HandlePrivateAsync(ClientSession session, ChatMessage message, CancellationToken token)
+    {
+        ErrorCode problem = ValidateMessageText(message.Text);
+        if (problem == ErrorCode.None
+            && (string.IsNullOrWhiteSpace(message.Recipient)
+                || UsernameValidator.Comparer.Equals(message.Recipient, session.Username)))
+        {
+            problem = ErrorCode.InvalidMessage; // alıcı yok ya da kişi kendine yazıyor
+        }
+
+        if (problem != ErrorCode.None)
+        {
+            await RejectMessageAsync(session, problem, token).ConfigureAwait(false);
+            return;
+        }
+
+        if (!_registry.TryGetActive(message.Recipient!, out ClientSession? target))
+        {
+            await RejectMessageAsync(session, ErrorCode.RecipientNotFound, token).ConfigureAwait(false);
+            return;
+        }
+
+        WriteLog($"{session.Username} → {target.Username}: [özel mesaj]");
+
+        var delivery = new ChatMessage(
+            MessageType.Private, Sender: session.Username, Recipient: target.Username, Text: message.Text, Timestamp: DateTime.Now);
+
+        if (!await _router.SendToAsync(target, delivery, token).ConfigureAwait(false))
+        {
+            await RejectMessageAsync(session, ErrorCode.RecipientNotFound, token).ConfigureAwait(false);
+            return;
+        }
+
+        // Gönderen de aynı kopyayı alır: mesajın iletildiğini ve sunucu saatini görür.
+        await _router.SendToAsync(session, delivery, token).ConfigureAwait(false);
+    }
+
+    private static ErrorCode ValidateMessageText(string? text)
+    {
+        if (string.IsNullOrWhiteSpace(text))
+        {
+            return ErrorCode.InvalidMessage;
+        }
+
+        return text.Length > ProtocolConstants.MaxMessageLength ? ErrorCode.MessageTooLong : ErrorCode.None;
+    }
+
+    /// <summary>Reddedilen mesajı gönderene bildirir ve log'a yazar (mesaj içeriği yazılmaz).</summary>
+    private async Task RejectMessageAsync(ClientSession session, ErrorCode reason, CancellationToken token)
+    {
+        WriteLog($"{session.Username} tarafından gönderilen mesaj reddedildi ({reason}).", ServerLogLevel.Error);
+        await SendErrorAsync(session, reason, token).ConfigureAwait(false);
+    }
     /// <summary>Bir satır okur; süre dolarsa null döner. Sunucu durdurulursa OperationCanceledException fırlatır.</summary>
     private static async Task<string?> ReadWithTimeoutAsync(ClientSession session, TimeSpan timeout, CancellationToken token)
     {

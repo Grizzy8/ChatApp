@@ -40,8 +40,10 @@ namespace ChatClient
             disconnectButton = new Button();
             chatBox = new RichTextBox();
             onlineGroup = new GroupBox();
-            onlineListBox = new ListBox();
+            onlineListBox = new DeselectableListBox();
             messagePanel = new Panel();
+            recipientLabel = new Label();
+            clearRecipientButton = new Button();
             messageTextBox = new TextBox();
             sendButton = new Button();
             statusStrip = new StatusStrip();
@@ -170,21 +172,46 @@ namespace ChatClient
             onlineListBox.Name = "onlineListBox";
             onlineListBox.Size = new Size(164, 368);
             onlineListBox.TabIndex = 0;
+            onlineListBox.SelectedIndexChanged += OnlineListBox_SelectedIndexChanged;
             //
             // messagePanel
             //
+            messagePanel.Controls.Add(recipientLabel);
+            messagePanel.Controls.Add(clearRecipientButton);
             messagePanel.Controls.Add(messageTextBox);
             messagePanel.Controls.Add(sendButton);
             messagePanel.Dock = DockStyle.Bottom;
-            messagePanel.Location = new Point(0, 437);
+            messagePanel.Location = new Point(0, 411);
             messagePanel.Name = "messagePanel";
-            messagePanel.Size = new Size(840, 44);
+            messagePanel.Size = new Size(840, 70);
             messagePanel.TabIndex = 3;
+            //
+            // recipientLabel
+            //
+            recipientLabel.AutoSize = true;
+            recipientLabel.ForeColor = SystemColors.GrayText;
+            recipientLabel.Location = new Point(11, 8);
+            recipientLabel.Name = "recipientLabel";
+            recipientLabel.Size = new Size(48, 15);
+            recipientLabel.TabIndex = 2;
+            recipientLabel.Text = "Herkese";
+            //
+            // clearRecipientButton
+            //
+            clearRecipientButton.Anchor = AnchorStyles.Top | AnchorStyles.Right;
+            clearRecipientButton.Location = new Point(737, 3);
+            clearRecipientButton.Name = "clearRecipientButton";
+            clearRecipientButton.Size = new Size(92, 24);
+            clearRecipientButton.TabIndex = 3;
+            clearRecipientButton.Text = "Herkese dön";
+            clearRecipientButton.UseVisualStyleBackColor = true;
+            clearRecipientButton.Visible = false;
+            clearRecipientButton.Click += ClearRecipientButton_Click;
             //
             // messageTextBox
             //
             messageTextBox.Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right;
-            messageTextBox.Location = new Point(11, 10);
+            messageTextBox.Location = new Point(11, 34);
             messageTextBox.Name = "messageTextBox";
             messageTextBox.PlaceholderText = "Mesajınızı yazın ve Enter'a basın";
             messageTextBox.Size = new Size(718, 23);
@@ -193,7 +220,7 @@ namespace ChatClient
             // sendButton
             //
             sendButton.Anchor = AnchorStyles.Top | AnchorStyles.Right;
-            sendButton.Location = new Point(737, 8);
+            sendButton.Location = new Point(737, 32);
             sendButton.Name = "sendButton";
             sendButton.Size = new Size(92, 27);
             sendButton.TabIndex = 1;
@@ -253,8 +280,10 @@ namespace ChatClient
         private Button disconnectButton;
         private RichTextBox chatBox;
         private GroupBox onlineGroup;
-        private ListBox onlineListBox;
+        private DeselectableListBox onlineListBox;
         private Panel messagePanel;
+        private Label recipientLabel;
+        private Button clearRecipientButton;
         private TextBox messageTextBox;
         private Button sendButton;
         private StatusStrip statusStrip;

@@ -33,6 +33,17 @@ public sealed class ChatView
         _box.ScrollToCaret();
     }
 
+    /// <summary>Özel mesaj satırı: mor ve "(özel)" etiketli. Kendi mesajım "Sen → alıcı", gelen "gönderen → Sen" biçiminde.</summary>
+    public void AppendPrivate(DateTime time, string sender, string recipient, string text, bool isOwn)
+    {
+        string route = isOwn ? $"Sen → {recipient}" : $"{sender} → Sen";
+
+        AppendSegment($"[{FormatTime(time)}] ", ClientConstants.SystemMessageColor, bold: false);
+        AppendSegment($"{route} (özel): ", ClientConstants.PrivateMessageColor, bold: true);
+        AppendSegment(text + Environment.NewLine, ClientConstants.PrivateMessageColor, bold: false);
+        _box.ScrollToCaret();
+    }
+
     public void AppendLine(DateTime time, string text, Color color)
     {
         AppendSegment($"[{FormatTime(time)}] {text}{Environment.NewLine}", color, bold: false);

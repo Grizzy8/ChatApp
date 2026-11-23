@@ -35,7 +35,11 @@ public sealed class MessageRouter
             .ConfigureAwait(false);
     }
 
-    private async Task DeliverAsync(ClientSession session, ChatMessage message, CancellationToken cancellationToken)
+    /// <summary>Mesajı tek bir istemciye iletir. İletilemezse bağlantı kapatılır ve false döner.</summary>
+    public Task<bool> SendToAsync(ClientSession target, ChatMessage message, CancellationToken cancellationToken) =>
+        DeliverAsync(target, message, cancellationToken);
+
+    private async Task<bool> DeliverAsync(ClientSession session, ChatMessage message, CancellationToken cancellationToken)
     {
         using var timeoutCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         timeoutCts.CancelAfter(DeliveryTimeout);
@@ -43,6 +47,7 @@ public sealed class MessageRouter
         try
         {
             await session.SendAsync(message, timeoutCts.Token).ConfigureAwait(false);
+            return true;
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
@@ -54,6 +59,7 @@ public sealed class MessageRouter
             // İstemcinin kendi okuma döngüsü bunu fark edip kaydını siler.
             DeliveryFailed?.Invoke(this, $"{session.Username} kullanıcısına mesaj iletilemedi, bağlantısı kapatılıyor: {ex.Message}");
             session.Dispose();
+            return false;
         }
     }
 }

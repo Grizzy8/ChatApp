@@ -91,11 +91,46 @@ namespace ChatClient
             messageTextBox.Clear();
             messageTextBox.Focus();
 
-            bool sent = await _client.SendChatAsync(text);
+            // Alıcı gönderme anında okunur; beklerken seçim değişse bile mesaj niyet edilen kişiye gider.
+            string? recipient = SelectedRecipient;
+            bool sent = recipient is null
+                ? await _client.SendChatAsync(text)
+                : await _client.SendPrivateAsync(recipient, text);
+
             if (!sent && !IsDisposed && messageTextBox.TextLength == 0)
             {
                 messageTextBox.Text = text;
             }
+        }
+
+        private string? SelectedRecipient => onlineListBox.SelectedItem as string;
+
+        private void ClearRecipientButton_Click(object? sender, EventArgs e)
+        {
+            onlineListBox.ClearSelected();
+            messageTextBox.Focus();
+        }
+
+        private void OnlineListBox_SelectedIndexChanged(object? sender, EventArgs e)
+        {
+            // Kendine özel mesaj anlamsızdır: kendi adını seçmek seçimi kaldırır.
+            if (UsernameValidator.Comparer.Equals(SelectedRecipient, _client.Username))
+            {
+                onlineListBox.ClearSelected();
+                return;
+            }
+
+            UpdateRecipientUi();
+        }
+
+        private void UpdateRecipientUi()
+        {
+            string? recipient = SelectedRecipient;
+            bool isPrivate = recipient is not null;
+
+            recipientLabel.Text = isPrivate ? $"→ {recipient} (özel mesaj)" : "Herkese";
+            recipientLabel.ForeColor = isPrivate ? ClientConstants.PrivateMessageColor : SystemColors.GrayText;
+            clearRecipientButton.Visible = isPrivate;
         }
 
         protected override void OnFormClosing(FormClosingEventArgs e)
@@ -139,6 +174,12 @@ namespace ChatClient
                     RemoveOnlineUser(message.Sender);
                     _chatView.AppendLine(message.Timestamp ?? DateTime.Now, $"{message.Sender} sohbetten ayrıldı.", ClientConstants.SystemMessageColor);
                     break;
+                case MessageType.Private:
+                    bool isSentByMe = UsernameValidator.Comparer.Equals(message.Sender, _client.Username);
+                    _chatView.AppendPrivate(
+                        message.Timestamp ?? DateTime.Now, message.Sender ?? "?", message.Recipient ?? "?",
+                        message.Text ?? string.Empty, isSentByMe);
+                    break;
                 case MessageType.Chat:
                     bool isOwn = UsernameValidator.Comparer.Equals(message.Sender, _client.Username);
                     _chatView.AppendChat(message.Timestamp ?? DateTime.Now, message.Sender ?? "?", message.Text ?? string.Empty, isOwn);
@@ -159,6 +200,7 @@ namespace ChatClient
             }
             onlineListBox.EndUpdate();
             UpdateOnlineCount();
+            UpdateRecipientUi();
         }
 
         private void AddOnlineUser(string username)
@@ -177,6 +219,7 @@ namespace ChatClient
             {
                 onlineListBox.Items.RemoveAt(index);
                 UpdateOnlineCount();
+                UpdateRecipientUi();
             }
         }
 
