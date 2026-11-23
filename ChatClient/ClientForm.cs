@@ -164,6 +164,7 @@ namespace ChatClient
                 case MessageType.JoinAccepted:
                     IReadOnlyList<string> users = message.Users ?? Array.Empty<string>();
                     SetOnlineUsers(users);
+                    BeginHistorySession(_client.Username);
                     _chatView.AppendSystem($"Sunucuya bağlandınız. Çevrimiçi: {string.Join(", ", users)}");
                     break;
                 case MessageType.UserJoined when message.Sender is not null:
@@ -175,14 +176,22 @@ namespace ChatClient
                     _chatView.AppendLine(message.Timestamp ?? DateTime.Now, $"{message.Sender} sohbetten ayrıldı.", ClientConstants.SystemMessageColor);
                     break;
                 case MessageType.Private:
+                    DateTime privateTime = message.Timestamp ?? DateTime.Now;
+                    string privateSender = message.Sender ?? "?";
+                    string privateRecipient = message.Recipient ?? "?";
+                    string privateText = message.Text ?? string.Empty;
                     bool isSentByMe = UsernameValidator.Comparer.Equals(message.Sender, _client.Username);
-                    _chatView.AppendPrivate(
-                        message.Timestamp ?? DateTime.Now, message.Sender ?? "?", message.Recipient ?? "?",
-                        message.Text ?? string.Empty, isSentByMe);
+                    _chatView.AppendPrivate(privateTime, privateSender, privateRecipient, privateText, isSentByMe);
+                    _ = SaveToHistoryAsync(
+                        privateTime, ChatHistoryStore.FormatPrivate(privateTime, privateSender, privateRecipient, privateText, isSentByMe));
                     break;
                 case MessageType.Chat:
+                    DateTime chatTime = message.Timestamp ?? DateTime.Now;
+                    string chatSender = message.Sender ?? "?";
+                    string chatText = message.Text ?? string.Empty;
                     bool isOwn = UsernameValidator.Comparer.Equals(message.Sender, _client.Username);
-                    _chatView.AppendChat(message.Timestamp ?? DateTime.Now, message.Sender ?? "?", message.Text ?? string.Empty, isOwn);
+                    _chatView.AppendChat(chatTime, chatSender, chatText, isOwn);
+                    _ = SaveToHistoryAsync(chatTime, ChatHistoryStore.FormatChat(chatTime, chatSender, chatText));
                     break;
                 case MessageType.Error:
                     _chatView.AppendError(ErrorMessages.Describe(message.ErrorCode));
@@ -246,6 +255,7 @@ namespace ChatClient
             }
 
             SetOnlineUsers(Array.Empty<string>());
+            _history = null;
 
             if (info.Reason == DisconnectReason.UserRequested)
             {

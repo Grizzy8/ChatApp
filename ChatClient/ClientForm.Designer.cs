@@ -48,6 +48,7 @@ namespace ChatClient
             sendButton = new Button();
             statusStrip = new StatusStrip();
             statusLabel = new ToolStripStatusLabel();
+            historyStatusLabel = new ToolStripStatusLabel();
             onlineGroup.SuspendLayout();
             messagePanel.SuspendLayout();
             connectionPanel.SuspendLayout();
@@ -230,7 +231,7 @@ namespace ChatClient
             //
             // statusStrip
             //
-            statusStrip.Items.AddRange(new ToolStripItem[] { statusLabel });
+            statusStrip.Items.AddRange(new ToolStripItem[] { statusLabel, historyStatusLabel });
             statusStrip.Location = new Point(0, 481);
             statusStrip.Name = "statusStrip";
             statusStrip.Size = new Size(840, 22);
@@ -240,7 +241,14 @@ namespace ChatClient
             //
             statusLabel.Name = "statusLabel";
             statusLabel.Size = new Size(71, 17);
+            statusLabel.Spring = true;
             statusLabel.Text = "Bağlı değil";
+            statusLabel.TextAlign = ContentAlignment.MiddleLeft;
+            //
+            // historyStatusLabel
+            //
+            historyStatusLabel.Name = "historyStatusLabel";
+            historyStatusLabel.Size = new Size(0, 17);
             //
             // ClientForm
             //
@@ -288,5 +296,6 @@ namespace ChatClient
         private Button sendButton;
         private StatusStrip statusStrip;
         private ToolStripStatusLabel statusLabel;
+        private ToolStripStatusLabel historyStatusLabel;
     }
 }

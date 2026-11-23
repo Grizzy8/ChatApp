@@ -44,6 +44,23 @@ public sealed class ChatView
         _box.ScrollToCaret();
     }
 
+    /// <summary>Önceki oturumlardan yüklenen geçmiş satırı (soluk gri).</summary>
+    public void AppendHistory(string line)
+    {
+        AppendSegment(line + Environment.NewLine, ClientConstants.HistoryMessageColor, bold: false);
+        _box.ScrollToCaret();
+    }
+
+    /// <summary>Geçmiş ile yeni mesajlar arasına ayraç satırı koyar.</summary>
+    public void AppendSeparator(string text)
+    {
+        AppendSegment($"── {text} ──{Environment.NewLine}", ClientConstants.HistoryMessageColor, bold: false);
+        _box.ScrollToCaret();
+    }
+
+    /// <summary>Tüm satırları siler (yeni bir oturum başlarken).</summary>
+    public void Clear() => _box.Clear();
+
     public void AppendLine(DateTime time, string text, Color color)
     {
         AppendSegment($"[{FormatTime(time)}] {text}{Environment.NewLine}", color, bold: false);
