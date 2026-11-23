@@ -13,5 +13,6 @@ public enum ErrorCode
     MessageTooLong,
     InvalidMessage,
     NotJoined,
-    ServerShuttingDown
+    ServerShuttingDown,
+    RateLimited
 }

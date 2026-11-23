@@ -33,6 +33,10 @@ public sealed class ClientSession : IDisposable
 
     public DateTime ConnectedAt { get; }
 
+    /// <summary>Bu istemcinin mesaj gönderme hızını sınırlar; sunucuyu mesaj yağmurundan korur.</summary>
+    public SlidingWindowRateLimiter RateLimiter { get; } =
+        new(ProtocolConstants.MaxMessagesPerWindow, ProtocolConstants.RateLimitWindow);
+
     public void AssignUsername(string username)
     {
         ArgumentException.ThrowIfNullOrEmpty(username);

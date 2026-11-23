@@ -17,6 +17,9 @@ public static class ErrorMessages
         ErrorCode.InvalidMessage => "Sunucu gönderilen mesajı anlayamadı.",
         ErrorCode.NotJoined => "Sohbete katılmadan işlem yapılamaz.",
         ErrorCode.ServerShuttingDown => "Sunucu kapatılıyor.",
+        ErrorCode.RateLimited =>
+            $"Çok hızlı mesaj gönderiyorsunuz. {ProtocolConstants.RateLimitWindow.TotalSeconds:0} saniyede en fazla " +
+            $"{ProtocolConstants.MaxMessagesPerWindow} mesaj gönderebilirsiniz.",
         _ => "Bilinmeyen bir hata oluştu."
     };
 

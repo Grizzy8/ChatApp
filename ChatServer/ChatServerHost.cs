@@ -19,6 +19,7 @@ public sealed class ChatServerHost : IDisposable
     private readonly SemaphoreSlim _membershipLock = new(1, 1);
     private TcpListener? _listener;
     private CancellationTokenSource? _cts;
+    private int _connectionCount;
 
     public ChatServerHost()
     {
@@ -121,6 +122,15 @@ public sealed class ChatServerHost : IDisposable
             while (!token.IsCancellationRequested)
             {
                 TcpClient client = await listener.AcceptTcpClientAsync(token).ConfigureAwait(false);
+
+                if (Interlocked.Increment(ref _connectionCount) > ProtocolConstants.MaxConnections)
+                {
+                    Interlocked.Decrement(ref _connectionCount);
+                    client.Dispose();
+                    WriteLog($"Bağlantı sınırı ({ProtocolConstants.MaxConnections}) dolu; yeni bağlantı reddedildi.", ServerLogLevel.Error);
+                    continue;
+                }
+
                 _ = HandleClientAsync(client, token);
             }
         }
@@ -137,6 +147,18 @@ public sealed class ChatServerHost : IDisposable
 
     /// <summary>Bir istemcinin tüm ömrünü yönetir. Hiçbir hatayı dışarı sızdırmaz.</summary>
     private async Task HandleClientAsync(TcpClient tcpClient, CancellationToken token)
+    {
+        try
+        {
+            await RunClientAsync(tcpClient, token).ConfigureAwait(false);
+        }
+        finally
+        {
+            Interlocked.Decrement(ref _connectionCount);
+        }
+    }
+
+    private async Task RunClientAsync(TcpClient tcpClient, CancellationToken token)
     {
         ClientSession session;
         try
@@ -175,7 +197,15 @@ public sealed class ChatServerHost : IDisposable
             }
             finally
             {
-                await RemoveAndAnnounceAsync(session, token).ConfigureAwait(false);
+                try
+                {
+                    await RemoveAndAnnounceAsync(session, token).ConfigureAwait(false);
+                }
+                catch (Exception ex)
+                {
+                    // Temizlik sırasındaki bir hata sunucuyu düşürmemeli; yine de kayda geçer.
+                    WriteLog($"{Describe(session)} temizlenirken hata: {ex.Message}", ServerLogLevel.Error);
+                }
             }
         }
     }
@@ -325,6 +355,12 @@ public sealed class ChatServerHost : IDisposable
 
     private async Task HandleMessageAsync(ClientSession session, ChatMessage message, CancellationToken token)
     {
+        if (message.Type is MessageType.Chat or MessageType.Private && !session.RateLimiter.TryAcquire())
+        {
+            await RejectMessageAsync(session, ErrorCode.RateLimited, token).ConfigureAwait(false);
+            return;
+        }
+
         switch (message.Type)
         {
             case MessageType.Chat:

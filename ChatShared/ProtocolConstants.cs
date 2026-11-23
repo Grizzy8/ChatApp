@@ -20,6 +20,14 @@ public static class ProtocolConstants
 
     public static readonly TimeSpan ConnectTimeout = TimeSpan.FromSeconds(5);
 
+    /// <summary>Bir istemcinin pencere süresi içinde gönderebileceği en fazla sohbet/özel mesaj sayısı.</summary>
+    public const int MaxMessagesPerWindow = 20;
+
+    public static readonly TimeSpan RateLimitWindow = TimeSpan.FromSeconds(5);
+
+    /// <summary>Sunucunun aynı anda kabul ettiği en fazla bağlantı (Join'e kadar olanlar dahil).</summary>
+    public const int MaxConnections = 100;
+
     /// <summary>Bağlanan istemcinin Join mesajını göndermesi için tanınan süre.</summary>
     public static readonly TimeSpan JoinTimeout = TimeSpan.FromSeconds(10);
 }

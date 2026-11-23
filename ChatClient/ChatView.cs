@@ -69,8 +69,24 @@ public sealed class ChatView
 
     private static string FormatTime(DateTime time) => time.ToString(ClientConstants.TimestampFormat);
 
+    private const int MaxLines = 5000;
+    private const int LinesToTrim = 500;
+
+    /// <summary>Uzun sohbetlerde bellek şişmesin: sınır aşılınca en eski satırlar ekrandan silinir (geçmiş dosyada durur).</summary>
+    private void TrimOldLines()
+    {
+        if (_box.GetLineFromCharIndex(_box.TextLength) < MaxLines)
+        {
+            return;
+        }
+
+        _box.Select(0, _box.GetFirstCharIndexFromLine(LinesToTrim));
+        _box.SelectedText = string.Empty;
+    }
+
     private void AppendSegment(string text, Color color, bool bold)
     {
+        TrimOldLines();
         _box.SelectionStart = _box.TextLength;
         _box.SelectionLength = 0;
         _box.SelectionColor = color;

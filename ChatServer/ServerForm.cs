@@ -122,12 +122,28 @@ namespace ChatServer
 
         private void AppendLog(ServerLogEntry entry)
         {
+            TrimOldLines();
             logBox.SelectionStart = logBox.TextLength;
             logBox.SelectionLength = 0;
             logBox.SelectionColor = entry.Level == ServerLogLevel.Error ? ErrorColor : InfoColor;
             logBox.AppendText($"[{entry.Time:HH:mm:ss}] {entry.Message}{Environment.NewLine}");
             logBox.SelectionColor = logBox.ForeColor;
             logBox.ScrollToCaret();
+        }
+
+        private const int MaxLogLines = 5000;
+        private const int LogLinesToTrim = 500;
+
+        /// <summary>Uzun süre açık kalan sunucuda log kutusu bellek yemesin: sınır aşılınca en eski satırlar silinir.</summary>
+        private void TrimOldLines()
+        {
+            if (logBox.GetLineFromCharIndex(logBox.TextLength) < MaxLogLines)
+            {
+                return;
+            }
+
+            logBox.Select(0, logBox.GetFirstCharIndexFromLine(LogLinesToTrim));
+            logBox.SelectedText = string.Empty;
         }
 
         /// <summary>Ağ thread'inden gelen çağrıları UI thread'ine taşır.</summary>
