@@ -19,6 +19,11 @@ namespace ChatServer
             portUpDown.Maximum = ProtocolConstants.MaxPort;
             portUpDown.Value = ProtocolConstants.DefaultPort;
 
+            // ListView sütun genişlikleri ekran DPI'ına göre kendiliğinden ölçeklenmez.
+            userColumn.Width = LogicalToDeviceUnits(120);
+            addressColumn.Width = LogicalToDeviceUnits(130);
+            connectedColumn.Width = LogicalToDeviceUnits(90);
+
             _host.LogWritten += OnLogWritten;
             _host.Stopped += OnHostStopped;
             _host.ClientsChanged += OnClientsChanged;
