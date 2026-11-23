@@ -1,3 +1,5 @@
+using System.Text.Json.Serialization;
+
 namespace ChatShared;
 
 /// <summary>
@@ -12,7 +14,7 @@ namespace ChatShared;
 /// <param name="Users">Çevrimiçi kullanıcı listesi (JoinAccepted).</param>
 /// <param name="ErrorCode">Hata kodu (JoinRejected, Error).</param>
 public sealed record ChatMessage(
-    MessageType Type,
+    [property: JsonRequired] MessageType Type,
     string? Sender = null,
     string? Recipient = null,
     string? Text = null,
