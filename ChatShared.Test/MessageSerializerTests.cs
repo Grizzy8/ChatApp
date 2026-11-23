@@ -39,6 +39,30 @@ public class MessageSerializerTests
     }
 
     [Fact]
+    public void RoundTrip_PreservesGroupLists()
+    {
+        var message = new ChatMessage(
+            MessageType.GroupList,
+            Groups: [new GroupInfo("AB23-CD45", "Arkadaşlar", GroupRole.Owner)],
+            Invites: [new GroupInviteInfo("EF67-GH89", "Ders", "Ali")],
+            Members: [new GroupMemberInfo("JK23-MN45", "Bea", GroupRole.Admin)]);
+
+        ChatMessage? copy = MessageSerializer.Deserialize(MessageSerializer.Serialize(message));
+
+        Assert.NotNull(copy);
+        Assert.Equal(GroupRole.Owner, copy.Groups!.Single().Role);
+        Assert.Equal("Ders", copy.Invites!.Single().GroupName);
+        Assert.Equal(GroupRole.Admin, copy.Members!.Single().Role);
+    }
+
+    [Fact]
+    public void Serialize_WritesGroupRoleAsString()
+    {
+        string json = MessageSerializer.Serialize(new ChatMessage(MessageType.GroupList, Groups: [new GroupInfo("AB23-CD45", "G", GroupRole.Member)]));
+        Assert.Contains("\"Member\"", json);
+    }
+
+    [Fact]
     public void RoundTrip_PreservesTurkishCharacters()
     {
         var original = new ChatMessage(MessageType.Chat, Sender: "Ayşe", Text: "Günaydın, çay İster misin? ğüşıöç");

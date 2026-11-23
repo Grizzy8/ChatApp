@@ -21,6 +21,7 @@ public static class ClientConstants
     public static readonly Color OwnMessageColor = Color.FromArgb(0, 90, 170);
     public static readonly Color OtherMessageColor = Color.FromArgb(30, 110, 60);
     public static readonly Color PrivateMessageColor = Color.FromArgb(125, 55, 160);
+    public static readonly Color GroupMessageColor = Color.FromArgb(0, 120, 130);
     public static readonly Color HistoryMessageColor = Color.FromArgb(150, 150, 150);
     public static readonly Color WarningColor = Color.FromArgb(180, 90, 0);
 

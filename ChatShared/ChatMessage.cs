@@ -17,6 +17,9 @@ namespace ChatShared;
 /// <param name="Password">Parola (yalnızca Register/Login isteğinde). ToString'e ve log'a asla yazılmaz.</param>
 /// <param name="UserId">Hesabın benzersiz kimliği (JoinAccepted).</param>
 /// <param name="Contacts">Kişi listesi (ContactList).</param>
+/// <param name="Groups">Üyesi olunan gruplar (GroupList).</param>
+/// <param name="Invites">Bekleyen davetler (InviteList).</param>
+/// <param name="Members">Bir grubun üyeleri (GroupMembers).</param>
 public sealed record ChatMessage(
     [property: JsonRequired] MessageType Type,
     string? Sender = null,
@@ -27,7 +30,10 @@ public sealed record ChatMessage(
     ErrorCode? ErrorCode = null,
     string? Password = null,
     string? UserId = null,
-    IReadOnlyList<ContactInfo>? Contacts = null)
+    IReadOnlyList<ContactInfo>? Contacts = null,
+    IReadOnlyList<GroupInfo>? Groups = null,
+    IReadOnlyList<GroupInviteInfo>? Invites = null,
+    IReadOnlyList<GroupMemberInfo>? Members = null)
 {
     // Record'un otomatik ToString'i tüm alanları yazar; bir hata ayıklama çıktısı ya da log satırı
     // parolayı ifşa etmesin diye Password bu çıktıdan çıkarılır.

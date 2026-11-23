@@ -48,6 +48,51 @@ public enum MessageType
     /// <summary>İstemci → Sunucu: kullanıcı bağlantıyı kendi isteğiyle kesiyor.</summary>
     Leave,
 
+    /// <summary>İstemci → Sunucu: grup kur. Text = grup adı. Başarıda GroupList gelir.</summary>
+    CreateGroup,
+
+    /// <summary>Sunucu → İstemci: üyesi olunan grupların tamamı (Groups). Girişte ve her değişiklikten sonra gönderilir.</summary>
+    GroupList,
+
+    /// <summary>Sunucu → İstemci: bekleyen davetlerin tamamı (Invites). Girişte ve her değişiklikten sonra gönderilir.</summary>
+    InviteList,
+
+    /// <summary>İstemci → Sunucu: gruba davet. Recipient = grup ID, Text = davet edilenin kullanıcı adı ya da ID'si.</summary>
+    InviteToGroup,
+
+    /// <summary>Sunucu → davet eden: davet bırakıldı. Recipient = grup ID, Text = davet edilenin kullanıcı adı.</summary>
+    InviteSent,
+
+    /// <summary>İstemci → Sunucu: daveti kabul et. Recipient = grup ID.</summary>
+    AcceptInvite,
+
+    /// <summary>İstemci → Sunucu: daveti reddet. Recipient = grup ID.</summary>
+    DeclineInvite,
+
+    /// <summary>İstemci → Sunucu: grup üyelerini iste. Recipient = grup ID. Yanıt GroupMembers.</summary>
+    GetGroupMembers,
+
+    /// <summary>Sunucu → İstemci: bir grubun üyeleri (Recipient = grup ID, Members). Üyelik değişince tüm çevrimiçi üyelere gönderilir.</summary>
+    GroupMembers,
+
+    /// <summary>Grup mesajı. İstemci → Sunucu: Recipient = grup ID, Text. Sunucu → çevrimiçi üyeler: Sender, Recipient (grup ID), Text, Timestamp.</summary>
+    GroupMessage,
+
+    /// <summary>İstemci → Sunucu: gruptan ayrıl. Recipient = grup ID.</summary>
+    LeaveGroup,
+
+    /// <summary>İstemci → Sunucu: üyeyi gruptan çıkar. Recipient = grup ID, Text = üyenin ID'si.</summary>
+    RemoveMember,
+
+    /// <summary>İstemci → Sunucu: üyeyi yönetici yap (yalnızca kurucu). Recipient = grup ID, Text = üyenin ID'si.</summary>
+    PromoteMember,
+
+    /// <summary>İstemci → Sunucu: yöneticiliği al (yalnızca kurucu). Recipient = grup ID, Text = üyenin ID'si.</summary>
+    DemoteMember,
+
+    /// <summary>İstemci → Sunucu: grubu sil (yalnızca kurucu). Recipient = grup ID.</summary>
+    DeleteGroup,
+
     /// <summary>Sunucu → İstemci: bir isteğin işlenemediğini bildirir, ErrorCode ekli.</summary>
     Error
 }

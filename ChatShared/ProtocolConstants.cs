@@ -31,6 +31,18 @@ public static class ProtocolConstants
     /// <summary>Teslim edilmeyen mesajların sunucuda saklanma süresi; sonra silinir.</summary>
     public static readonly TimeSpan PendingMessageRetention = TimeSpan.FromDays(30);
 
+    /// <summary>Grup adının en fazla uzunluğu.</summary>
+    public const int GroupNameMaxLength = 30;
+
+    /// <summary>Bir kullanıcının üyesi olabileceği en fazla grup.</summary>
+    public const int MaxGroupsPerUser = 20;
+
+    /// <summary>Bir grubun en fazla üyesi (bekleyen davetler de bu sayıya dahildir).</summary>
+    public const int MaxGroupMembers = 50;
+
+    /// <summary>Bir kullanıcının aynı anda bekleyen en fazla daveti.</summary>
+    public const int MaxPendingInvitesPerUser = 50;
+
     /// <summary>Kişi eklerken yazılan kullanıcı adı/ID metninin en fazla uzunluğu.</summary>
     public const int MaxContactQueryLength = 40;
 

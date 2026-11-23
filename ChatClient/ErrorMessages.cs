@@ -29,6 +29,17 @@ public static class ErrorMessages
         ErrorCode.ContactAlreadyExists => "Bu kişi zaten kişilerinizde.",
         ErrorCode.CannotAddSelf => "Kendinizi kişi olarak ekleyemezsiniz.",
         ErrorCode.ContactLimitReached => $"En fazla {ProtocolConstants.MaxContacts} kişi ekleyebilirsiniz.",
+        ErrorCode.GroupNameInvalid => $"Grup adı 1-{ProtocolConstants.GroupNameMaxLength} karakter olmalı.",
+        ErrorCode.GroupNotFound => "Böyle bir grup yok ya da bu grubun üyesi değilsiniz.",
+        ErrorCode.NotAuthorized => "Bu işlem için yetkiniz yok.",
+        ErrorCode.GroupLimitReached => $"En fazla {ProtocolConstants.MaxGroupsPerUser} gruba üye olabilirsiniz.",
+        ErrorCode.GroupFull => $"Grup dolu (en fazla {ProtocolConstants.MaxGroupMembers} üye, bekleyen davetler dahil).",
+        ErrorCode.AlreadyGroupMember => "Bu kişi zaten grubun üyesi.",
+        ErrorCode.AlreadyInvited => "Bu kişiye zaten davet gönderilmiş.",
+        ErrorCode.InviteLimitReached => "Bu kişinin bekleyen davet kutusu dolu.",
+        ErrorCode.InviteNotFound => "Bu davet artık geçerli değil.",
+        ErrorCode.OwnerCannotLeave => "Kurucu gruptan ayrılamaz; grubu silebilirsiniz.",
+        ErrorCode.MemberNotFound => "Bu kişi grubun üyesi değil.",
         ErrorCode.RateLimited =>
             $"Çok hızlı mesaj gönderiyorsunuz. {ProtocolConstants.RateLimitWindow.TotalSeconds:0} saniyede en fazla " +
             $"{ProtocolConstants.MaxMessagesPerWindow} mesaj gönderebilirsiniz.",

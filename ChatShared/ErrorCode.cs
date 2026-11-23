@@ -39,5 +39,31 @@ public enum ErrorCode
     ContactLimitReached,
 
     /// <summary>Alıcının bekleyen mesaj kutusu dolu; çevrimdışı alıcıya yeni mesaj bırakılamaz.</summary>
-    RecipientInboxFull
+    RecipientInboxFull,
+
+    GroupNameInvalid,
+
+    /// <summary>Grup yok ya da kullanıcı üyesi değil (ikisi bilerek ayırt edilmez; grupların varlığı sızmasın).</summary>
+    GroupNotFound,
+
+    /// <summary>Rolün bu işlem için yetkisi yok.</summary>
+    NotAuthorized,
+
+    GroupLimitReached,
+
+    GroupFull,
+
+    AlreadyGroupMember,
+
+    AlreadyInvited,
+
+    InviteLimitReached,
+
+    InviteNotFound,
+
+    /// <summary>Kurucu gruptan ayrılamaz; grubu silmelidir.</summary>
+    OwnerCannotLeave,
+
+    /// <summary>İşlem yapılmak istenen üye grupta yok ya da bu işlem ona uygulanamaz.</summary>
+    MemberNotFound
 }

@@ -192,10 +192,10 @@ namespace ChatClient
             sideTabs.Controls.Add(onlineTab);
             sideTabs.Controls.Add(contactsTab);
             sideTabs.Dock = DockStyle.Right;
-            sideTabs.Location = new Point(610, 41);
+            sideTabs.Location = new Point(500, 41);
             sideTabs.Name = "sideTabs";
             sideTabs.SelectedIndex = 0;
-            sideTabs.Size = new Size(230, 396);
+            sideTabs.Size = new Size(340, 396);
             sideTabs.TabIndex = 4;
             //
             // onlineTab

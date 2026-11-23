@@ -44,6 +44,16 @@ public sealed class ChatView
         _box.ScrollToCaret();
     }
 
+    /// <summary>Grup mesajı satırı: "[Grup adı] gönderen: metin"; kendi mesajım ve başkalarınınki ayrı renkte.</summary>
+    public void AppendGroup(DateTime time, string groupName, string sender, string text, bool isOwn)
+    {
+        AppendSegment($"[{FormatTime(time)}] ", ClientConstants.SystemMessageColor, bold: false);
+        AppendSegment($"[{groupName}] ", ClientConstants.GroupMessageColor, bold: true);
+        AppendSegment($"{sender}: ", isOwn ? ClientConstants.OwnMessageColor : ClientConstants.OtherMessageColor, bold: true);
+        AppendSegment(text + Environment.NewLine, _box.ForeColor, bold: false);
+        _box.ScrollToCaret();
+    }
+
     /// <summary>Önceki oturumlardan yüklenen geçmiş satırı (soluk gri).</summary>
     public void AppendHistory(string line)
     {

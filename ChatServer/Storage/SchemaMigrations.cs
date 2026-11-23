@@ -45,6 +45,36 @@ internal static class SchemaMigrations
             SentAt      TEXT NOT NULL
         ) STRICT;
         CREATE INDEX IX_PendingMessages_Recipient ON PendingMessages (RecipientId, Id);
+        """,
+
+        // v4: gruplar, üyelikler ve bekleyen davetler. Rol metin olarak saklanır ve CHECK ile sınırlıdır.
+        // Davet = Invites satırı; çevrimdışı kullanıcı girince görür, kabul/red ile satır silinir.
+        // Hesap ya da grup silinince bağlı üyelik ve davetler de silinir.
+        """
+        CREATE TABLE Groups (
+            Id        TEXT NOT NULL PRIMARY KEY,
+            Name      TEXT NOT NULL,
+            OwnerId   TEXT NOT NULL REFERENCES Users(Id) ON DELETE CASCADE,
+            CreatedAt TEXT NOT NULL
+        ) STRICT;
+
+        CREATE TABLE GroupMembers (
+            GroupId  TEXT NOT NULL REFERENCES Groups(Id) ON DELETE CASCADE,
+            UserId   TEXT NOT NULL REFERENCES Users(Id) ON DELETE CASCADE,
+            Role     TEXT NOT NULL CHECK (Role IN ('Owner', 'Admin', 'Member')),
+            JoinedAt TEXT NOT NULL,
+            PRIMARY KEY (GroupId, UserId)
+        ) STRICT;
+        CREATE INDEX IX_GroupMembers_User ON GroupMembers (UserId);
+
+        CREATE TABLE GroupInvites (
+            GroupId   TEXT NOT NULL REFERENCES Groups(Id) ON DELETE CASCADE,
+            InviteeId TEXT NOT NULL REFERENCES Users(Id) ON DELETE CASCADE,
+            InviterId TEXT NOT NULL REFERENCES Users(Id) ON DELETE CASCADE,
+            CreatedAt TEXT NOT NULL,
+            PRIMARY KEY (GroupId, InviteeId)
+        ) STRICT;
+        CREATE INDEX IX_GroupInvites_Invitee ON GroupInvites (InviteeId);
         """
     ];
 

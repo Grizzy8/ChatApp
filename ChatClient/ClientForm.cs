@@ -13,6 +13,7 @@ namespace ChatClient
         {
             InitializeComponent();
             InitializeContactsTab();
+            InitializeGroupsTab();
 
             // Windows Forms, form oluşturulurken UI thread'ine ait bir SynchronizationContext kurar;
             // servis event'lerini bu context ile UI thread'inde tetikler.
@@ -125,9 +126,12 @@ namespace ChatClient
 
             // Alıcı gönderme anında okunur; beklerken seçim değişse bile mesaj niyet edilen kişiye gider.
             string? recipient = SelectedRecipient;
-            bool sent = recipient is null
-                ? await _client.SendChatAsync(text)
-                : await _client.SendPrivateAsync(recipient, text);
+            string? groupId = _chosenGroupId;
+            bool sent = groupId is not null
+                ? await _client.SendGroupMessageAsync(groupId, text)
+                : recipient is null
+                    ? await _client.SendChatAsync(text)
+                    : await _client.SendPrivateAsync(recipient, text);
 
             if (!sent && !IsDisposed && messageTextBox.TextLength == 0)
             {
@@ -145,6 +149,11 @@ namespace ChatClient
         private void SetRecipient(string? username)
         {
             _chosenRecipient = username;
+            if (username is not null)
+            {
+                _chosenGroupId = null; // hedef ya kişi ya da grup olabilir
+            }
+
             UpdateRecipientUi();
         }
 
@@ -152,6 +161,7 @@ namespace ChatClient
         {
             _isSyncingRecipient = true;
             try { onlineListBox.ClearSelected(); } finally { _isSyncingRecipient = false; }
+            _chosenGroupId = null;
             SetRecipient(null);
             messageTextBox.Focus();
         }
@@ -177,6 +187,14 @@ namespace ChatClient
 
         private void UpdateRecipientUi()
         {
+            if (_chosenGroupId is not null)
+            {
+                recipientLabel.Text = $"→ Grup: {GroupNameOf(_chosenGroupId)}";
+                recipientLabel.ForeColor = ClientConstants.GroupMessageColor;
+                clearRecipientButton.Visible = true;
+                return;
+            }
+
             string? recipient = SelectedRecipient;
             bool isPrivate = recipient is not null;
 
@@ -245,6 +263,21 @@ namespace ChatClient
                     break;
                 case MessageType.ContactList:
                     SetContacts(message.Contacts);
+                    break;
+                case MessageType.GroupList:
+                    SetGroups(message.Groups);
+                    break;
+                case MessageType.InviteList:
+                    SetInvites(message.Invites);
+                    break;
+                case MessageType.GroupMembers:
+                    SetGroupMembers(message.Recipient, message.Members);
+                    break;
+                case MessageType.GroupMessage:
+                    ShowGroupMessage(message);
+                    break;
+                case MessageType.InviteSent:
+                    _chatView.AppendSystem($"{message.Text} gruba davet edildi.");
                     break;
                 case MessageType.Error:
                     _chatView.AppendError(ErrorMessages.Describe(message.ErrorCode));
@@ -327,8 +360,10 @@ namespace ChatClient
             }
 
             _chosenRecipient = null;
+            _chosenGroupId = null;
             SetOnlineUsers(Array.Empty<string>());
             ClearContacts();
+            ClearGroups();
             _history = null;
 
             if (info.Reason == DisconnectReason.UserRequested)
@@ -367,6 +402,7 @@ namespace ChatClient
             connectButton.Enabled = isDisconnected;
             registerButton.Enabled = isDisconnected;
             UpdateContactsUi(state == ConnectionState.Connected);
+            UpdateGroupButtons();
             bool isConnected = state == ConnectionState.Connected;
             disconnectButton.Enabled = isConnected;
             messageTextBox.Enabled = isConnected;

@@ -30,16 +30,19 @@ public sealed partial class ChatServerHost : IDisposable
     private readonly UserRepository _users;
     private readonly ContactRepository _contacts;
     private readonly MessageRepository _messages;
+    private readonly GroupRepository _groups;
     private readonly AuthAttemptLimiter _authLimiter;
 
-    public ChatServerHost(UserRepository users, ContactRepository contacts, MessageRepository messages, AuthAttemptLimiter? authLimiter = null)
+    public ChatServerHost(UserRepository users, ContactRepository contacts, MessageRepository messages, GroupRepository groups, AuthAttemptLimiter? authLimiter = null)
     {
         ArgumentNullException.ThrowIfNull(users);
         ArgumentNullException.ThrowIfNull(contacts);
         ArgumentNullException.ThrowIfNull(messages);
+        ArgumentNullException.ThrowIfNull(groups);
         _users = users;
         _contacts = contacts;
         _messages = messages;
+        _groups = groups;
         _authLimiter = authLimiter ?? new AuthAttemptLimiter();
 
         _router = new MessageRouter(_registry);
@@ -296,6 +299,7 @@ public sealed partial class ChatServerHost : IDisposable
 
         // Kişi listesi girişten hemen sonra, JoinAccepted'ın ardından gönderilir.
         await SendContactListAsync(session, token).ConfigureAwait(false);
+        await SendGroupStateAsync(session, token).ConfigureAwait(false);
         await DeliverPendingMessagesAsync(session, token).ConfigureAwait(false);
         return true;
     }
@@ -444,7 +448,8 @@ public sealed partial class ChatServerHost : IDisposable
 
     private async Task HandleMessageAsync(ClientSession session, ChatMessage message, CancellationToken token)
     {
-        if (message.Type is MessageType.Chat or MessageType.Private or MessageType.AddContact or MessageType.RemoveContact && !session.RateLimiter.TryAcquire())
+        if ((message.Type is MessageType.Chat or MessageType.Private or MessageType.AddContact or MessageType.RemoveContact || IsGroupRequest(message.Type))
+            && !session.RateLimiter.TryAcquire())
         {
             await RejectMessageAsync(session, ErrorCode.RateLimited, token).ConfigureAwait(false);
             return;
@@ -460,6 +465,9 @@ public sealed partial class ChatServerHost : IDisposable
                 break;
             case MessageType.AddContact or MessageType.RemoveContact:
                 await HandleContactRequestAsync(session, message, token).ConfigureAwait(false);
+                break;
+            case var type when IsGroupRequest(type):
+                await HandleGroupRequestAsync(session, message, token).ConfigureAwait(false);
                 break;
             default:
                 WriteLog($"{session.Username} geçersiz mesaj türü gönderdi ({message.Type}), yok sayıldı.", ServerLogLevel.Error);

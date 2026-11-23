@@ -168,10 +168,66 @@ public sealed class ChatClientService : IDisposable
         return SendMessageAsync(new ChatMessage(MessageType.RemoveContact, Text: userId), cancellationToken);
     }
 
+    // ---- gruplar ----
+
+    /// <summary>Grup kurar. Sonuç GroupList (başarı) ya da Error olarak MessageReceived'da iletilir.</summary>
+    public Task<bool> CreateGroupAsync(string name, CancellationToken cancellationToken = default)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(name);
+        return SendMessageAsync(new ChatMessage(MessageType.CreateGroup, Text: name.Trim()), cancellationToken);
+    }
+
+    /// <summary>Gruba kullanıcı adı ya da ID ile davet gönderir (kurucu/yönetici).</summary>
+    public Task<bool> InviteToGroupAsync(string groupId, string usernameOrId, CancellationToken cancellationToken = default)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(usernameOrId);
+        return SendGroupRequestAsync(MessageType.InviteToGroup, groupId, usernameOrId.Trim(), cancellationToken);
+    }
+
+    public Task<bool> AcceptInviteAsync(string groupId, CancellationToken cancellationToken = default) =>
+        SendGroupRequestAsync(MessageType.AcceptInvite, groupId, null, cancellationToken);
+
+    public Task<bool> DeclineInviteAsync(string groupId, CancellationToken cancellationToken = default) =>
+        SendGroupRequestAsync(MessageType.DeclineInvite, groupId, null, cancellationToken);
+
+    public Task<bool> RequestGroupMembersAsync(string groupId, CancellationToken cancellationToken = default) =>
+        SendGroupRequestAsync(MessageType.GetGroupMembers, groupId, null, cancellationToken);
+
+    public Task<bool> SendGroupMessageAsync(string groupId, string text, CancellationToken cancellationToken = default) =>
+        SendGroupRequestAsync(MessageType.GroupMessage, groupId, text, cancellationToken);
+
+    public Task<bool> LeaveGroupAsync(string groupId, CancellationToken cancellationToken = default) =>
+        SendGroupRequestAsync(MessageType.LeaveGroup, groupId, null, cancellationToken);
+
+    public Task<bool> DeleteGroupAsync(string groupId, CancellationToken cancellationToken = default) =>
+        SendGroupRequestAsync(MessageType.DeleteGroup, groupId, null, cancellationToken);
+
+    /// <summary>Üyeyi (kimliğiyle) gruptan çıkarır.</summary>
+    public Task<bool> RemoveMemberAsync(string groupId, string memberId, CancellationToken cancellationToken = default) =>
+        SendGroupRequestAsync(MessageType.RemoveMember, groupId, memberId, cancellationToken);
+
+    /// <summary>Üyeyi yönetici yapar (yalnızca kurucu).</summary>
+    public Task<bool> PromoteMemberAsync(string groupId, string memberId, CancellationToken cancellationToken = default) =>
+        SendGroupRequestAsync(MessageType.PromoteMember, groupId, memberId, cancellationToken);
+
+    /// <summary>Yöneticiliği alır (yalnızca kurucu).</summary>
+    public Task<bool> DemoteMemberAsync(string groupId, string memberId, CancellationToken cancellationToken = default) =>
+        SendGroupRequestAsync(MessageType.DemoteMember, groupId, memberId, cancellationToken);
+
+    private Task<bool> SendGroupRequestAsync(MessageType type, string groupId, string? text, CancellationToken cancellationToken)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(groupId);
+        return SendMessageAsync(new ChatMessage(type, Recipient: groupId, Text: text), cancellationToken);
+    }
+
     private async Task<bool> SendMessageAsync(ChatMessage message, CancellationToken cancellationToken)
     {
-        ArgumentException.ThrowIfNullOrWhiteSpace(message.Text);
-        ArgumentOutOfRangeException.ThrowIfGreaterThan(message.Text.Length, ProtocolConstants.MaxMessageLength);
+        // Metin zorunlu olmayan istekler (örn. LeaveGroup) null Text ile gönderilir; varsa uzunluğu sınırlıdır.
+        if (message.Text is not null)
+        {
+            ArgumentException.ThrowIfNullOrWhiteSpace(message.Text);
+            ArgumentOutOfRangeException.ThrowIfGreaterThan(message.Text.Length, ProtocolConstants.MaxMessageLength);
+        }
 
         MessageChannel? channel;
         lock (_gate)

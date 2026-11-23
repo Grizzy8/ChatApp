@@ -35,6 +35,10 @@ public sealed class ChatHistoryStore
     public static string FormatChat(DateTime time, string sender, string text) =>
         $"[{time.ToString(ClientConstants.TimestampFormat)}] {sender}: {SingleLine(text)}";
 
+    /// <summary>Grup mesajı satırı: "[14:02:11] [Arkadaşlar] Ali: selam".</summary>
+    public static string FormatGroup(DateTime time, string groupName, string sender, string text) =>
+        $"[{time.ToString(ClientConstants.TimestampFormat)}] [{groupName}] {sender}: {SingleLine(text)}";
+
     /// <summary>Özel mesaj satırı: "[14:02:11] Sen → Ayşe (özel): selam".</summary>
     public static string FormatPrivate(DateTime time, string sender, string recipient, string text, bool isOwn)
     {
