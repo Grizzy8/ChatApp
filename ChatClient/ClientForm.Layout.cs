@@ -84,14 +84,14 @@ namespace ChatClient
         {
             var card = new TableLayoutPanel { AutoSize = true, ColumnCount = 1, Anchor = AnchorStyles.None, Padding = new Padding(8) };
             var title = new Label { Text = "ChatApp", AutoSize = true, Font = new Font("Segoe UI", 24f, FontStyle.Bold), ForeColor = Color.White, Margin = new Padding(3, 3, 3, 2) };
-            var subtitle = new Label { Text = "Hesabınızla giriş yapın ya da yeni hesap oluşturun.", AutoSize = true, ForeColor = Theme.Muted, Margin = new Padding(3, 0, 3, 18) };
+            var subtitle = new Label { Text = "Giriş yapın ya da hesap oluşturun.", AutoSize = true, ForeColor = Theme.Muted, Margin = new Padding(3, 0, 3, 18) };
 
             var serverRow = new FlowLayoutPanel { AutoSize = true, Margin = new Padding(0) };
             serverRow.Controls.Add(hostTextBox);
             serverRow.Controls.Add(portUpDown);
             hostTextBox.Margin = new Padding(3, 3, 12, 3);
 
-            var buttons = new TableLayoutPanel { AutoSize = true, ColumnCount = 2, Dock = DockStyle.Fill, Margin = new Padding(0, 10, 0, 0) };
+            var buttons = new TableLayoutPanel { AutoSize = false, Size = new Size(300, 36), ColumnCount = 2, Margin = new Padding(3, 10, 3, 0) };
             buttons.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50));
             buttons.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50));
             buttons.Controls.Add(connectButton, 0, 0);
