@@ -12,6 +12,16 @@ public static class ProtocolConstants
     public const int UsernameMinLength = 3;
     public const int UsernameMaxLength = 20;
 
+    public const int PasswordMinLength = 8;
+
+    /// <summary>Üst sınır, aşırı uzun parolalarla sunucuyu yormayı önler.</summary>
+    public const int PasswordMaxLength = 64;
+
+    /// <summary>Aynı IP adresinden pencere süresi içinde yapılabilecek en fazla kayıt/giriş denemesi.</summary>
+    public const int MaxAuthAttemptsPerWindow = 10;
+
+    public static readonly TimeSpan AuthAttemptWindow = TimeSpan.FromMinutes(1);
+
     /// <summary>Tek bir sohbet mesajının en fazla karakter sayısı.</summary>
     public const int MaxMessageLength = 500;
 

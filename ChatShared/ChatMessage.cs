@@ -1,3 +1,4 @@
+using System.Text;
 using System.Text.Json.Serialization;
 
 namespace ChatShared;
@@ -13,6 +14,8 @@ namespace ChatShared;
 /// <param name="Timestamp">Sunucunun atadığı zaman damgası.</param>
 /// <param name="Users">Çevrimiçi kullanıcı listesi (JoinAccepted).</param>
 /// <param name="ErrorCode">Hata kodu (JoinRejected, Error).</param>
+/// <param name="Password">Parola (yalnızca Register/Login isteğinde). ToString'e ve log'a asla yazılmaz.</param>
+/// <param name="UserId">Hesabın benzersiz kimliği (JoinAccepted).</param>
 public sealed record ChatMessage(
     [property: JsonRequired] MessageType Type,
     string? Sender = null,
@@ -20,4 +23,19 @@ public sealed record ChatMessage(
     string? Text = null,
     DateTime? Timestamp = null,
     IReadOnlyList<string>? Users = null,
-    ErrorCode? ErrorCode = null);
+    ErrorCode? ErrorCode = null,
+    string? Password = null,
+    string? UserId = null)
+{
+    // Record'un otomatik ToString'i tüm alanları yazar; bir hata ayıklama çıktısı ya da log satırı
+    // parolayı ifşa etmesin diye Password bu çıktıdan çıkarılır.
+    private bool PrintMembers(StringBuilder builder)
+    {
+        builder.Append("Type = ").Append(Type);
+        if (Sender is not null) builder.Append(", Sender = ").Append(Sender);
+        if (Recipient is not null) builder.Append(", Recipient = ").Append(Recipient);
+        if (ErrorCode is not null) builder.Append(", ErrorCode = ").Append(ErrorCode);
+        if (UserId is not null) builder.Append(", UserId = ").Append(UserId);
+        return true;
+    }
+}

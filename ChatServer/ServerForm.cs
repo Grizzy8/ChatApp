@@ -1,5 +1,7 @@
 using System.Net.Sockets;
+using ChatServer.Storage;
 using ChatShared;
+using Microsoft.Data.Sqlite;
 
 namespace ChatServer
 {
@@ -9,11 +11,13 @@ namespace ChatServer
         private static readonly Color ErrorColor = Color.Firebrick;
         private static readonly Color InfoColor = Color.FromArgb(40, 40, 40);
 
-        private readonly ChatServerHost _host = new();
+        private readonly ChatDatabase _database = new(ChatDatabase.DefaultPath);
+        private readonly ChatServerHost _host;
 
         public ServerForm()
         {
             InitializeComponent();
+            _host = new ChatServerHost(new UserRepository(_database));
 
             portUpDown.Minimum = ProtocolConstants.MinPort;
             portUpDown.Maximum = ProtocolConstants.MaxPort;
@@ -30,11 +34,14 @@ namespace ChatServer
             UpdateUiState(isRunning: false);
         }
 
-        private void StartButton_Click(object? sender, EventArgs e)
+        private async void StartButton_Click(object? sender, EventArgs e)
         {
             int port = (int)portUpDown.Value;
+            startButton.Enabled = false;
             try
             {
+                // Şema güncel değilse hesap verisi okunamaz; sunucu dinlemeye başlamadan hazırlanır.
+                await _database.InitializeAsync();
                 _host.Start(port);
                 UpdateUiState(isRunning: true);
             }
@@ -42,7 +49,7 @@ namespace ChatServer
             {
                 ReportStartFailure(DescribeSocketError(ex, port));
             }
-            catch (InvalidOperationException ex)
+            catch (Exception ex) when (ex is SqliteException or IOException or UnauthorizedAccessException or InvalidOperationException)
             {
                 ReportStartFailure(ex.Message);
             }

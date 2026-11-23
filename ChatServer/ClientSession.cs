@@ -37,6 +37,15 @@ public sealed class ClientSession : IDisposable
     public SlidingWindowRateLimiter RateLimiter { get; } =
         new(ProtocolConstants.MaxMessagesPerWindow, ProtocolConstants.RateLimitWindow);
 
+    /// <summary>Hesabın benzersiz kimliği; giriş kabul edilene kadar null kalır.</summary>
+    public string? UserId { get; private set; }
+
+    public void AssignUserId(string userId)
+    {
+        ArgumentException.ThrowIfNullOrEmpty(userId);
+        UserId = userId;
+    }
+
     public void AssignUsername(string username)
     {
         ArgumentException.ThrowIfNullOrEmpty(username);

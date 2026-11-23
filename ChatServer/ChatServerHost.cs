@@ -1,11 +1,13 @@
 using System.Net;
 using System.Net.Sockets;
+using ChatServer.Storage;
 using ChatShared;
+using Microsoft.Data.Sqlite;
 
 namespace ChatServer;
 
 /// <summary>
-/// TcpListener ile gelen bağlantıları dinler ve Join el sıkışmasını yürütür.
+/// TcpListener ile gelen bağlantıları dinler ve kayıt/giriş el sıkışmasını yürütür.
 /// Arayüzden bağımsızdır; olayları event ile dışarı bildirir.
 /// Event'ler arka plan thread'lerinden tetiklenebilir.
 /// </summary>
@@ -21,8 +23,19 @@ public sealed class ChatServerHost : IDisposable
     private CancellationTokenSource? _cts;
     private int _connectionCount;
 
-    public ChatServerHost()
+    // Var olmayan kullanıcı için de gerçek bir doğrulama yapılır; böylece yanıt süresine bakarak
+    // hangi kullanıcı adlarının kayıtlı olduğu anlaşılamaz.
+    private static readonly Lazy<string> DummyPasswordHash = new(() => PasswordHasher.Hash("zamanlama-icin-sahte-parola"));
+
+    private readonly UserRepository _users;
+    private readonly AuthAttemptLimiter _authLimiter;
+
+    public ChatServerHost(UserRepository users, AuthAttemptLimiter? authLimiter = null)
     {
+        ArgumentNullException.ThrowIfNull(users);
+        _users = users;
+        _authLimiter = authLimiter ?? new AuthAttemptLimiter();
+
         _router = new MessageRouter(_registry);
         _router.DeliveryFailed += (_, text) => WriteLog(text, ServerLogLevel.Error);
     }
@@ -211,15 +224,16 @@ public sealed class ChatServerHost : IDisposable
     }
 
     /// <summary>
-    /// Join el sıkışması: ilk mesaj süre içinde gelen geçerli bir Join olmalıdır.
-    /// Kabul edilirse oturum kaydedilir; aksi halde istemciye sebep bildirilir.
+    /// Kimlik el sıkışması: ilk mesaj süre içinde gelen geçerli bir Register ya da Login olmalıdır.
+    /// Kabul edilirse oturum kaydedilir; aksi halde istemciye sebep bildirilir ve bağlantı kapanır.
+    /// Parola hiçbir zaman log'a yazılmaz.
     /// </summary>
     private async Task<bool> TryJoinAsync(ClientSession session, CancellationToken token)
     {
         string? line = await ReadWithTimeoutAsync(session, ProtocolConstants.JoinTimeout, token).ConfigureAwait(false);
         if (line is null)
         {
-            WriteLog($"{session.Endpoint} katılma mesajı göndermeden ayrıldı veya süre doldu.");
+            WriteLog($"{session.Endpoint} giriş mesajı göndermeden ayrıldı veya süre doldu.");
             return false;
         }
 
@@ -231,17 +245,37 @@ public sealed class ChatServerHost : IDisposable
             return false;
         }
 
-        if (message.Type != MessageType.Join)
+        if (message.Type is not (MessageType.Register or MessageType.Login))
         {
             await SendErrorAsync(session, ErrorCode.NotJoined, token).ConfigureAwait(false);
-            WriteLog($"{session.Endpoint} katılmadan {message.Type} mesajı gönderdi, bağlantı kapatıldı.", ServerLogLevel.Error);
+            WriteLog($"{session.Endpoint} giriş yapmadan {message.Type} mesajı gönderdi, bağlantı kapatıldı.", ServerLogLevel.Error);
             return false;
         }
 
-        ErrorCode rejection = UsernameValidator.Validate(message.Sender);
+        if (!_authLimiter.TryAcquire(session.Endpoint))
+        {
+            WriteLog($"{session.Endpoint} çok fazla kayıt/giriş denemesi yaptı, reddedildi.", ServerLogLevel.Error);
+            await session.SendAsync(new ChatMessage(MessageType.JoinRejected, ErrorCode: ErrorCode.TooManyAttempts), token).ConfigureAwait(false);
+            return false;
+        }
+
+        ErrorCode rejection;
+        UserRecord? user;
+        try
+        {
+            (rejection, user) = message.Type == MessageType.Register
+                ? await RegisterAccountAsync(message, token).ConfigureAwait(false)
+                : await AuthenticateAsync(message, token).ConfigureAwait(false);
+        }
+        catch (Exception ex) when (ex is SqliteException or InvalidOperationException)
+        {
+            WriteLog($"{session.Endpoint} için veritabanı hatası: {ex.Message}", ServerLogLevel.Error);
+            (rejection, user) = (ErrorCode.ServerError, null);
+        }
+
         if (rejection == ErrorCode.None)
         {
-            rejection = await RegisterAndAnnounceAsync(session, message.Sender!, token).ConfigureAwait(false);
+            rejection = await RegisterAndAnnounceAsync(session, user!, token).ConfigureAwait(false);
         }
 
         if (rejection != ErrorCode.None)
@@ -256,32 +290,77 @@ public sealed class ChatServerHost : IDisposable
         return true;
     }
 
+    /// <summary>Yeni hesap oluşturur: kuralları doğrular, parolayı hash'ler (CPU işi, thread havuzunda) ve kaydeder.</summary>
+    private async Task<(ErrorCode Error, UserRecord? User)> RegisterAccountAsync(ChatMessage message, CancellationToken token)
+    {
+        ErrorCode problem = UsernameValidator.Validate(message.Sender);
+        if (problem == ErrorCode.None)
+        {
+            problem = PasswordValidator.Validate(message.Password);
+        }
+
+        if (problem != ErrorCode.None)
+        {
+            return (problem, null);
+        }
+
+        string password = message.Password!;
+        string hash = await Task.Run(() => PasswordHasher.Hash(password), token).ConfigureAwait(false);
+        UserRecord? created = await _users.CreateAsync(message.Sender!, hash, token).ConfigureAwait(false);
+
+        return created is null ? (ErrorCode.UsernameTaken, null) : (ErrorCode.None, created);
+    }
+
     /// <summary>
-    /// Kullanıcıyı kaydeder, JoinAccepted yanıtını gönderir ve diğerlerine UserJoined bildirir.
+    /// Mevcut hesabı doğrular. Kullanıcı adı yanlış da olsa parola yanlış da olsa aynı hata ve benzer süre
+    /// döner; hangisinin yanlış olduğu bilerek söylenmez.
+    /// </summary>
+    private async Task<(ErrorCode Error, UserRecord? User)> AuthenticateAsync(ChatMessage message, CancellationToken token)
+    {
+        string? password = message.Password;
+        if (UsernameValidator.Validate(message.Sender) != ErrorCode.None
+            || string.IsNullOrEmpty(password)
+            || password.Length > ProtocolConstants.PasswordMaxLength)
+        {
+            return (ErrorCode.InvalidCredentials, null);
+        }
+
+        UserRecord? user = await _users.FindByUsernameAsync(message.Sender!, token).ConfigureAwait(false);
+        string stored = user?.PasswordHash ?? DummyPasswordHash.Value;
+        bool isCorrect = await Task.Run(() => PasswordHasher.Verify(password, stored), token).ConfigureAwait(false);
+
+        return user is not null && isCorrect ? (ErrorCode.None, user) : (ErrorCode.InvalidCredentials, null);
+    }
+
+    /// <summary>
+    /// Kullanıcıyı çevrimiçi olarak kaydeder, JoinAccepted yanıtını gönderir ve diğerlerine UserJoined bildirir.
     /// Katılma ve ayrılma işlemleri sırayla yürütülür; böylece her istemcinin gördüğü kullanıcı listesi
     /// ile sonradan aldığı UserJoined/UserLeft olayları birbiriyle tutarlı kalır.
     /// </summary>
-    private async Task<ErrorCode> RegisterAndAnnounceAsync(ClientSession session, string username, CancellationToken token)
+    private async Task<ErrorCode> RegisterAndAnnounceAsync(ClientSession session, UserRecord user, CancellationToken token)
     {
         await _membershipLock.WaitAsync(token).ConfigureAwait(false);
         try
         {
-            if (!_registry.TryAdd(username, session))
+            session.AssignUserId(user.Id);
+            if (!_registry.TryAdd(user.Username, session))
             {
-                return ErrorCode.UsernameTaken;
+                return ErrorCode.AccountAlreadyOnline;
             }
 
             using (var sendCts = CancellationTokenSource.CreateLinkedTokenSource(token))
             {
                 sendCts.CancelAfter(MessageRouter.DeliveryTimeout);
                 await session.SendAsync(
-                    new ChatMessage(MessageType.JoinAccepted, Timestamp: DateTime.Now, Users: _registry.GetUsernames()),
+                    new ChatMessage(
+                        MessageType.JoinAccepted, Sender: user.Username, UserId: user.Id,
+                        Timestamp: DateTime.Now, Users: _registry.GetUsernames()),
                     sendCts.Token).ConfigureAwait(false);
             }
 
             session.MarkActive();
 
-            var joined = new ChatMessage(MessageType.UserJoined, Sender: username, Timestamp: DateTime.Now);
+            var joined = new ChatMessage(MessageType.UserJoined, Sender: user.Username, Timestamp: DateTime.Now);
             await _router.BroadcastAsync(joined, token, excluded: session).ConfigureAwait(false);
             return ErrorCode.None;
         }

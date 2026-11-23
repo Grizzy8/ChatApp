@@ -63,11 +63,33 @@ public class MessageSerializerTests
     [Fact]
     public void Deserialize_ReadsHandWrittenJson()
     {
-        var result = MessageSerializer.Deserialize("{\"type\":\"Join\",\"sender\":\"ali\"}");
+        var result = MessageSerializer.Deserialize("{\"type\":\"Login\",\"sender\":\"ali\",\"password\":\"parola-123\"}");
 
         Assert.NotNull(result);
-        Assert.Equal(MessageType.Join, result.Type);
+        Assert.Equal(MessageType.Login, result.Type);
         Assert.Equal("ali", result.Sender);
+        Assert.Equal("parola-123", result.Password);
+    }
+
+    [Fact]
+    public void RoundTrip_PreservesPasswordAndUserId()
+    {
+        var original = new ChatMessage(MessageType.Register, Sender: "ali", Password: "parola-123", UserId: "K7M2-9QXD");
+
+        var result = MessageSerializer.Deserialize(MessageSerializer.Serialize(original));
+
+        Assert.NotNull(result);
+        Assert.Equal("parola-123", result.Password);
+        Assert.Equal("K7M2-9QXD", result.UserId);
+    }
+
+    [Fact]
+    public void ToString_NeverRevealsThePassword()
+    {
+        var message = new ChatMessage(MessageType.Login, Sender: "ali", Password: "çok-gizli-parola");
+
+        Assert.DoesNotContain("çok-gizli-parola", message.ToString());
+        Assert.Contains("ali", message.ToString());
     }
 
     [Theory]
@@ -75,7 +97,7 @@ public class MessageSerializerTests
     [InlineData("")]
     [InlineData("   ")]
     [InlineData("merhaba bu json degil")]
-    [InlineData("{\"type\":\"Join\"")]
+    [InlineData("{\"type\":\"Login\"")]
     [InlineData("[1,2,3]")]
     [InlineData("null")]
     [InlineData("{}")]

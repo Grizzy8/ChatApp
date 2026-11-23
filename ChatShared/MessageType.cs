@@ -3,13 +3,19 @@ namespace ChatShared;
 /// <summary>Sunucu ile istemci arasındaki mesaj türleri.</summary>
 public enum MessageType
 {
-    /// <summary>İstemci → Sunucu: kullanıcı adıyla katılma isteği.</summary>
-    Join,
+    /// <summary>İstemci → Sunucu: yeni hesap oluşturma isteği (Sender = kullanıcı adı, Password). Başarılıysa oturum da açılır.</summary>
+    Register,
 
-    /// <summary>Sunucu → İstemci: katılma kabul edildi, çevrimiçi kullanıcı listesi ekli.</summary>
+    /// <summary>İstemci → Sunucu: mevcut hesapla giriş isteği (Sender = kullanıcı adı, Password).</summary>
+    Login,
+
+    /// <summary>
+    /// Sunucu → İstemci: kayıt/giriş kabul edildi ve sohbete katılındı. Sender = hesabın kayıtlı kullanıcı adı,
+    /// UserId = hesabın benzersiz kimliği, Users = çevrimiçi kullanıcı listesi.
+    /// </summary>
     JoinAccepted,
 
-    /// <summary>Sunucu → İstemci: katılma reddedildi, ErrorCode ekli.</summary>
+    /// <summary>Sunucu → İstemci: kayıt/giriş reddedildi, ErrorCode ekli.</summary>
     JoinRejected,
 
     /// <summary>Genel sohbet mesajı (istemci → sunucu → herkes).</summary>

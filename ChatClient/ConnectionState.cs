@@ -27,10 +27,22 @@ public enum DisconnectReason
 /// <summary>Bağlantı sona erdiğinde kullanıcıya gösterilecek bilgi.</summary>
 public sealed record DisconnectInfo(DisconnectReason Reason, string Message);
 
-/// <summary>ConnectAsync sonucu. Başarısızlık sebebi kullanıcıya gösterilebilir Türkçe metindir.</summary>
-public sealed record ConnectResult(bool Success, string? Error = null, IReadOnlyList<string>? Users = null)
+/// <summary>Bağlanırken mevcut hesapla mı giriş yapılacağı, yoksa yeni hesap mı oluşturulacağı.</summary>
+public enum AuthMode
 {
-    public static ConnectResult Succeeded(IReadOnlyList<string> users) => new(true, Users: users);
+    Login,
+    Register
+}
+
+/// <summary>
+/// ConnectAsync sonucu. Başarısızlık sebebi kullanıcıya gösterilebilir Türkçe metindir.
+/// Başarıda Username hesabın sunucuda kayıtlı yazımıdır (kullanıcı "ALI" yazsa da kayıt "Ali" ise "Ali").
+/// </summary>
+public sealed record ConnectResult(
+    bool Success, string? Error = null, IReadOnlyList<string>? Users = null, string? Username = null, string? UserId = null)
+{
+    public static ConnectResult Succeeded(string username, string userId, IReadOnlyList<string> users) =>
+        new(true, Users: users, Username: username, UserId: userId);
 
     public static ConnectResult Failed(string error) => new(false, error);
 }

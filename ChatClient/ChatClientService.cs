@@ -4,7 +4,7 @@ using ChatShared;
 namespace ChatClient;
 
 /// <summary>
-/// Sunucuya bağlanır, Join el sıkışmasını yapar ve gelen mesajları dinler. Arayüzden bağımsızdır.
+/// Sunucuya bağlanır, kayıt/giriş el sıkışmasını yapar ve gelen mesajları dinler. Arayüzden bağımsızdır.
 /// Event'ler, oluşturulurken verilen SynchronizationContext üzerinden (WinForms'ta UI thread'i)
 /// ve tetiklendikleri sırayla iletilir; context verilmezse çağıran thread'de tetiklenir.
 /// </summary>
@@ -15,6 +15,7 @@ public sealed class ChatClientService : IDisposable
 
     private ConnectionState _state = ConnectionState.Disconnected;
     private string? _username;
+    private string? _userId;
     private MessageChannel? _channel;
     private CancellationTokenSource? _receiveCts;
     private Task _receiveTask = Task.CompletedTask;
@@ -60,11 +61,25 @@ public sealed class ChatClientService : IDisposable
         }
     }
 
+    /// <summary>Bağlıyken hesabın benzersiz kimliği, aksi halde null.</summary>
+    public string? UserId
+    {
+        get
+        {
+            lock (_gate)
+            {
+                return _userId;
+            }
+        }
+    }
+
     /// <summary>
-    /// Sunucuya bağlanır ve Join el sıkışmasını tamamlar. Beklenen hatalar (sunucu kapalı, ad kullanımda,
+    /// Sunucuya bağlanır ve kayıt/giriş el sıkışmasını tamamlar. Beklenen hatalar (sunucu kapalı, yanlış parola,
     /// zaman aşımı...) exception olarak değil, Türkçe açıklamalı bir ConnectResult olarak döner.
+    /// Parola yalnızca bu çağrıda gönderilir; serviste saklanmaz.
     /// </summary>
-    public async Task<ConnectResult> ConnectAsync(string host, int port, string username, CancellationToken cancellationToken = default)
+    public async Task<ConnectResult> ConnectAsync(
+        string host, int port, string username, string password, AuthMode mode, CancellationToken cancellationToken = default)
     {
         lock (_gate)
         {
@@ -87,7 +102,9 @@ public sealed class ChatClientService : IDisposable
             await tcpClient.ConnectAsync(host, port, handshakeCts.Token).ConfigureAwait(false);
             var channel = new MessageChannel(tcpClient);
 
-            await channel.SendAsync(new ChatMessage(MessageType.Join, Sender: username), handshakeCts.Token).ConfigureAwait(false);
+            var request = new ChatMessage(
+                mode == AuthMode.Register ? MessageType.Register : MessageType.Login, Sender: username, Password: password);
+            await channel.SendAsync(request, handshakeCts.Token).ConfigureAwait(false);
             ConnectResult result = await ReadJoinReplyAsync(channel, handshakeCts.Token).ConfigureAwait(false);
 
             if (!result.Success)
@@ -95,7 +112,7 @@ public sealed class ChatClientService : IDisposable
                 return AbortConnect(tcpClient, result);
             }
 
-            CompleteConnect(channel, username, result.Users ?? Array.Empty<string>());
+            CompleteConnect(channel, result.Username!, result.UserId!, result.Users ?? Array.Empty<string>());
             return result;
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
@@ -202,6 +219,7 @@ public sealed class ChatClientService : IDisposable
             _receiveCts = null;
             _state = ConnectionState.Disconnected;
             _username = null;
+            _userId = null;
         }
 
         cts?.Cancel();
@@ -220,7 +238,8 @@ public sealed class ChatClientService : IDisposable
         ChatMessage? reply = MessageSerializer.Deserialize(line);
         return reply?.Type switch
         {
-            MessageType.JoinAccepted => ConnectResult.Succeeded(reply.Users ?? Array.Empty<string>()),
+            MessageType.JoinAccepted when reply.Sender is not null && reply.UserId is not null =>
+                ConnectResult.Succeeded(reply.Sender, reply.UserId, reply.Users ?? Array.Empty<string>()),
             MessageType.JoinRejected or MessageType.Error => ConnectResult.Failed(ErrorMessages.Describe(reply.ErrorCode)),
             _ => ConnectResult.Failed("Sunucudan beklenmeyen bir yanıt alındı.")
         };
@@ -239,7 +258,7 @@ public sealed class ChatClientService : IDisposable
         return failure;
     }
 
-    private void CompleteConnect(MessageChannel channel, string username, IReadOnlyList<string> users)
+    private void CompleteConnect(MessageChannel channel, string username, string userId, IReadOnlyList<string> users)
     {
         var cts = new CancellationTokenSource();
 
@@ -248,6 +267,7 @@ public sealed class ChatClientService : IDisposable
             _channel = channel;
             _receiveCts = cts;
             _username = username;
+            _userId = userId;
             _shutdownNoticed = false;
             _state = ConnectionState.Connected;
         }
@@ -256,11 +276,14 @@ public sealed class ChatClientService : IDisposable
 
         // Başlangıç kullanıcı listesi, sonradan gelecek UserJoined/UserLeft olaylarından önce
         // aynı sıralı kanaldan iletilir; dinleme döngüsü ancak bundan sonra başlar.
-        RaiseMessageReceived(new ChatMessage(MessageType.JoinAccepted, Users: users));
+        RaiseMessageReceived(new ChatMessage(MessageType.JoinAccepted, Sender: username, UserId: userId, Users: users));
 
+        // Belirteç, görev başlamadan önce alınır: bağlantı hemen kesilirse cts atılmış olabilir ve
+        // lambda içinde cts.Token okumak ObjectDisposedException fırlatırdı.
+        CancellationToken receiveToken = cts.Token;
         lock (_gate)
         {
-            _receiveTask = Task.Run(() => ReceiveLoopAsync(channel, cts.Token));
+            _receiveTask = Task.Run(() => ReceiveLoopAsync(channel, receiveToken));
         }
     }
 
@@ -328,6 +351,7 @@ public sealed class ChatClientService : IDisposable
             _channel = null;
             _receiveCts = null;
             _username = null;
+            _userId = null;
             _state = ConnectionState.Disconnected;
         }
 

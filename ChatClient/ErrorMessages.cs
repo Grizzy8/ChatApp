@@ -8,7 +8,7 @@ public static class ErrorMessages
 {
     public static string Describe(ErrorCode? code) => code switch
     {
-        ErrorCode.UsernameTaken => "Bu kullanıcı adı zaten kullanılıyor. Lütfen başka bir ad seçin.",
+        ErrorCode.UsernameTaken => "Bu kullanıcı adı zaten kayıtlı. Lütfen başka bir ad seçin ya da giriş yapın.",
         ErrorCode.UsernameInvalid =>
             $"Kullanıcı adı {ProtocolConstants.UsernameMinLength}-{ProtocolConstants.UsernameMaxLength} karakter olmalı; " +
             "yalnızca harf, rakam ve _ içerebilir.",
@@ -17,6 +17,13 @@ public static class ErrorMessages
         ErrorCode.InvalidMessage => "Sunucu gönderilen mesajı anlayamadı.",
         ErrorCode.NotJoined => "Sohbete katılmadan işlem yapılamaz.",
         ErrorCode.ServerShuttingDown => "Sunucu kapatılıyor.",
+        ErrorCode.PasswordInvalid =>
+            $"Parola {ProtocolConstants.PasswordMinLength}-{ProtocolConstants.PasswordMaxLength} karakter olmalı " +
+            "ve yalnızca boşluklardan oluşamaz.",
+        ErrorCode.InvalidCredentials => "Kullanıcı adı veya parola hatalı.",
+        ErrorCode.AccountAlreadyOnline => "Bu hesap şu anda başka bir yerde açık.",
+        ErrorCode.TooManyAttempts => "Çok fazla deneme yaptınız. Lütfen bir dakika bekleyip tekrar deneyin.",
+        ErrorCode.ServerError => "Sunucuda beklenmeyen bir sorun oluştu. Lütfen daha sonra tekrar deneyin.",
         ErrorCode.RateLimited =>
             $"Çok hızlı mesaj gönderiyorsunuz. {ProtocolConstants.RateLimitWindow.TotalSeconds:0} saniyede en fazla " +
             $"{ProtocolConstants.MaxMessagesPerWindow} mesaj gönderebilirsiniz.",

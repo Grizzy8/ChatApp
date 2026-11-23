@@ -23,6 +23,7 @@ namespace ChatClient
             portUpDown.Maximum = ProtocolConstants.MaxPort;
             portUpDown.Value = ProtocolConstants.DefaultPort;
             usernameTextBox.MaxLength = ProtocolConstants.UsernameMaxLength;
+            passwordTextBox.MaxLength = ProtocolConstants.PasswordMaxLength;
             messageTextBox.MaxLength = ProtocolConstants.MaxMessageLength;
             onlineListBox.Sorted = true;
 
@@ -35,23 +36,49 @@ namespace ChatClient
 
         private async void ConnectButton_Click(object? sender, EventArgs e)
         {
-            string host = hostTextBox.Text.Trim();
             string username = usernameTextBox.Text.Trim();
-            int port = (int)portUpDown.Value;
+            string password = passwordTextBox.Text;
 
-            string? validationError = ValidateInput(host, username);
+            string? validationError = ValidateLogin(hostTextBox.Text.Trim(), username, password);
             if (validationError is not null)
             {
                 MessageBox.Show(this, validationError, "Eksik veya hatalı bilgi", MessageBoxButtons.OK, MessageBoxIcon.Warning);
                 return;
             }
 
+            await ConnectAsync(username, password, AuthMode.Login);
+        }
+
+        private async void RegisterButton_Click(object? sender, EventArgs e)
+        {
+            if (hostTextBox.Text.Trim().Length == 0)
+            {
+                MessageBox.Show(this, "Lütfen sunucu adresini girin.", "Eksik bilgi", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                return;
+            }
+
+            using var dialog = new RegisterDialog(usernameTextBox.Text.Trim());
+            if (dialog.ShowDialog(this) != DialogResult.OK)
+            {
+                return;
+            }
+
+            usernameTextBox.Text = dialog.Username;
+            passwordTextBox.Text = dialog.Password;
+            await ConnectAsync(dialog.Username, dialog.Password, AuthMode.Register);
+        }
+
+        private async Task ConnectAsync(string username, string password, AuthMode mode)
+        {
+            string host = hostTextBox.Text.Trim();
+            int port = (int)portUpDown.Value;
+
             _chatView.AppendSystem($"{host}:{port} adresine bağlanılıyor...");
 
             ConnectResult result;
             try
             {
-                result = await _client.ConnectAsync(host, port, username, _lifetimeCts.Token);
+                result = await _client.ConnectAsync(host, port, username, password, mode, _lifetimeCts.Token);
             }
             catch (InvalidOperationException ex)
             {
@@ -65,12 +92,16 @@ namespace ChatClient
 
             if (!result.Success)
             {
-                _chatView.AppendError($"Bağlantı kurulamadı: {result.Error}");
-                MessageBox.Show(this, result.Error, "Bağlantı kurulamadı", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                string title = mode == AuthMode.Register ? "Hesap oluşturulamadı" : "Giriş yapılamadı";
+                _chatView.AppendError($"{title}: {result.Error}");
+                MessageBox.Show(this, result.Error, title, MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                return;
             }
 
-            // Başarılıysa "bağlandınız" satırı ve kullanıcı listesi, servisin ilettiği
-            // JoinAccepted olayıyla (OnMessageReceived) sırayla gösterilir.
+            // Parola işi bitince bellekte ve kutuda bırakılmaz. Başarılıysa "bağlandınız" satırı ve kullanıcı
+            // listesi, servisin ilettiği JoinAccepted olayıyla (OnMessageReceived) sırayla gösterilir.
+            passwordTextBox.Clear();
+            usernameTextBox.Text = result.Username;
         }
 
         private async void DisconnectButton_Click(object? sender, EventArgs e)
@@ -267,16 +298,19 @@ namespace ChatClient
             }
         }
 
-        private static string? ValidateInput(string host, string username)
+        private static string? ValidateLogin(string host, string username, string password)
         {
             if (host.Length == 0)
             {
                 return "Lütfen sunucu adresini girin.";
             }
 
-            return UsernameValidator.IsValid(username)
-                ? null
-                : ErrorMessages.Describe(ErrorCode.UsernameInvalid);
+            if (!UsernameValidator.IsValid(username))
+            {
+                return ErrorMessages.Describe(ErrorCode.UsernameInvalid);
+            }
+
+            return password.Length == 0 ? "Lütfen parolanızı girin." : null;
         }
 
         private void UpdateUiState(ConnectionState state)
@@ -286,7 +320,9 @@ namespace ChatClient
             hostTextBox.Enabled = isDisconnected;
             portUpDown.Enabled = isDisconnected;
             usernameTextBox.Enabled = isDisconnected;
+            passwordTextBox.Enabled = isDisconnected;
             connectButton.Enabled = isDisconnected;
+            registerButton.Enabled = isDisconnected;
             bool isConnected = state == ConnectionState.Connected;
             disconnectButton.Enabled = isConnected;
             messageTextBox.Enabled = isConnected;
@@ -302,7 +338,8 @@ namespace ChatClient
             statusLabel.Text = state switch
             {
                 ConnectionState.Connecting => "Bağlanıyor...",
-                ConnectionState.Connected => $"Bağlı — {_client.Username} @ {hostTextBox.Text.Trim()}:{(int)portUpDown.Value}",
+                ConnectionState.Connected =>
+                    $"Bağlı — {_client.Username} (ID: {_client.UserId}) @ {hostTextBox.Text.Trim()}:{(int)portUpDown.Value}",
                 _ => "Bağlı değil"
             };
         }

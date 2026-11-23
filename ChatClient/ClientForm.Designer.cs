@@ -36,6 +36,9 @@ namespace ChatClient
             portUpDown = new NumericUpDown();
             usernameLabel = new Label();
             usernameTextBox = new TextBox();
+            passwordLabel = new Label();
+            passwordTextBox = new TextBox();
+            registerButton = new Button();
             connectButton = new Button();
             disconnectButton = new Button();
             chatBox = new RichTextBox();
@@ -66,7 +69,10 @@ namespace ChatClient
             connectionPanel.Controls.Add(portUpDown);
             connectionPanel.Controls.Add(usernameLabel);
             connectionPanel.Controls.Add(usernameTextBox);
+            connectionPanel.Controls.Add(passwordLabel);
+            connectionPanel.Controls.Add(passwordTextBox);
             connectionPanel.Controls.Add(connectButton);
+            connectionPanel.Controls.Add(registerButton);
             connectionPanel.Controls.Add(disconnectButton);
             connectionPanel.Dock = DockStyle.Top;
             connectionPanel.Location = new Point(0, 0);
@@ -87,7 +93,7 @@ namespace ChatClient
             //
             hostTextBox.Location = new Point(69, 9);
             hostTextBox.Name = "hostTextBox";
-            hostTextBox.Size = new Size(130, 23);
+            hostTextBox.Size = new Size(110, 23);
             hostTextBox.TabIndex = 1;
             //
             // portLabel
@@ -117,25 +123,50 @@ namespace ChatClient
             //
             usernameTextBox.Location = new Point(417, 9);
             usernameTextBox.Name = "usernameTextBox";
-            usernameTextBox.Size = new Size(130, 23);
+            usernameTextBox.Size = new Size(110, 23);
             usernameTextBox.TabIndex = 5;
+            //
+            // passwordLabel
+            //
+            passwordLabel.AutoSize = true;
+            passwordLabel.Margin = new Padding(3, 6, 3, 0);
+            passwordLabel.Name = "passwordLabel";
+            passwordLabel.TabIndex = 6;
+            passwordLabel.Text = "Parola:";
+            //
+            // passwordTextBox
+            //
+            passwordTextBox.Name = "passwordTextBox";
+            passwordTextBox.Size = new Size(120, 23);
+            passwordTextBox.TabIndex = 7;
+            passwordTextBox.UseSystemPasswordChar = true;
             //
             // connectButton
             //
             connectButton.Location = new Point(553, 8);
             connectButton.Name = "connectButton";
-            connectButton.Size = new Size(90, 26);
-            connectButton.TabIndex = 6;
-            connectButton.Text = "Bağlan";
+            connectButton.Size = new Size(80, 26);
+            connectButton.TabIndex = 8;
+            connectButton.Text = "Giriş Yap";
             connectButton.UseVisualStyleBackColor = true;
             connectButton.Click += ConnectButton_Click;
+            //
+            // registerButton
+            //
+            registerButton.Location = new Point(649, 8);
+            registerButton.Name = "registerButton";
+            registerButton.Size = new Size(90, 26);
+            registerButton.TabIndex = 9;
+            registerButton.Text = "Kayıt Ol...";
+            registerButton.UseVisualStyleBackColor = true;
+            registerButton.Click += RegisterButton_Click;
             //
             // disconnectButton
             //
             disconnectButton.Location = new Point(649, 8);
             disconnectButton.Name = "disconnectButton";
-            disconnectButton.Size = new Size(120, 26);
-            disconnectButton.TabIndex = 7;
+            disconnectButton.Size = new Size(110, 26);
+            disconnectButton.TabIndex = 10;
             disconnectButton.Text = "Bağlantıyı Kes";
             disconnectButton.UseVisualStyleBackColor = true;
             disconnectButton.Click += DisconnectButton_Click;
@@ -255,7 +286,7 @@ namespace ChatClient
             AcceptButton = connectButton;
             AutoScaleDimensions = new SizeF(7F, 15F);
             AutoScaleMode = AutoScaleMode.Font;
-            ClientSize = new Size(840, 503);
+            ClientSize = new Size(1000, 503);
             Controls.Add(chatBox);
             Controls.Add(onlineGroup);
             Controls.Add(messagePanel);
@@ -285,6 +316,9 @@ namespace ChatClient
         private Label usernameLabel;
         private TextBox usernameTextBox;
         private Button connectButton;
+        private Label passwordLabel;
+        private TextBox passwordTextBox;
+        private Button registerButton;
         private Button disconnectButton;
         private RichTextBox chatBox;
         private GroupBox onlineGroup;
