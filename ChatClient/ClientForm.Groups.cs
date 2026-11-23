@@ -34,6 +34,7 @@ namespace ChatClient
         private readonly Button toggleAdminButton = NewContactButton("Yönetici yap");
         private readonly Button leaveGroupButton = NewContactButton("Gruptan ayrıl");
         private readonly Button deleteGroupButton = NewContactButton("Grubu sil");
+        private readonly Button renameGroupButton = NewContactButton("Adı değiştir");
         private readonly Button acceptInviteButton = NewContactButton("Kabul et");
         private readonly Button declineInviteButton = NewContactButton("Reddet");
 
@@ -91,6 +92,7 @@ namespace ChatClient
             toggleAdminButton.Click += async (_, _) => await RunMemberActionAsync((g, m) => m.Role == GroupRole.Admin
                 ? _client.DemoteMemberAsync(g.Id, m.UserId)
                 : _client.PromoteMemberAsync(g.Id, m.UserId));
+            renameGroupButton.Click += async (_, _) => await RenameSelectedGroupAsync();
             leaveGroupButton.Click += async (_, _) => await RunGroupActionAsync(g => _client.LeaveGroupAsync(g.Id));
             deleteGroupButton.Click += OnDeleteGroupClick;
             acceptInviteButton.Click += async (_, _) => await RunInviteActionAsync(i => _client.AcceptInviteAsync(i.GroupId));
@@ -119,7 +121,7 @@ namespace ChatClient
             inputs.Controls.Add(inviteButton, 1, 1);
 
             var actions = new FlowLayoutPanel { Dock = DockStyle.Fill, AutoSize = true, WrapContents = true, Margin = new Padding(0) };
-            foreach (Button button in new[] { writeToGroupButton, removeMemberButton, toggleAdminButton, leaveGroupButton, deleteGroupButton })
+            foreach (Button button in new[] { writeToGroupButton, removeMemberButton, toggleAdminButton, renameGroupButton, leaveGroupButton, deleteGroupButton })
             {
                 button.Anchor = AnchorStyles.None;
                 button.Margin = new Padding(0, 0, 4, 2);
@@ -222,6 +224,23 @@ namespace ChatClient
             if ((invitesListBox.SelectedItem as InviteListItem)?.Invite is { } invite)
             {
                 await action(invite);
+            }
+        }
+
+        // Yeni ad, "Yeni grup adı" kutusundan alınır (grup kurmak için de aynı kutu kullanılır).
+        private async Task RenameSelectedGroupAsync()
+        {
+            string name = newGroupTextBox.Text.Trim();
+            if (SelectedGroup is not { } group || name.Length == 0)
+            {
+                newGroupTextBox.Focus();
+                return;
+            }
+
+            newGroupTextBox.Clear();
+            if (!await _client.RenameGroupAsync(group.Id, name) && !IsDisposed)
+            {
+                newGroupTextBox.Text = name;
             }
         }
 
@@ -338,6 +357,11 @@ namespace ChatClient
             foreach (GroupInfo changed in after)
             {
                 GroupInfo? old = before.FirstOrDefault(b => b.Id == changed.Id);
+                if (old is not null && old.Name != changed.Name)
+                {
+                    _chatView.AppendSystem($"\"{old.Name}\" grubunun adı \"{changed.Name}\" oldu.");
+                }
+
                 if (old is not null && old.Role != changed.Role)
                 {
                     _chatView.AppendSystem($"\"{changed.Name}\" grubundaki rolünüz: {RoleNames.Describe(changed.Role)}.");
@@ -460,6 +484,7 @@ namespace ChatClient
             toggleAdminButton.Enabled = connected && group is not null && isOther
                 && GroupPermissions.CanChangeRoles(group.Role) && member!.Role != GroupRole.Owner;
             toggleAdminButton.Text = member?.Role == GroupRole.Admin ? "Yöneticiliği al" : "Yönetici yap";
+            renameGroupButton.Enabled = connected && group is not null && GroupPermissions.CanRename(group.Role);
             leaveGroupButton.Enabled = connected && group is not null && GroupPermissions.CanLeave(group.Role);
             deleteGroupButton.Enabled = connected && group is not null && GroupPermissions.CanDeleteGroup(group.Role);
 

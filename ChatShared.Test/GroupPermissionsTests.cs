@@ -32,6 +32,7 @@ public class GroupPermissionsTests
     {
         Assert.Equal(expected, GroupPermissions.CanChangeRoles(role));
         Assert.Equal(expected, GroupPermissions.CanDeleteGroup(role));
+        Assert.Equal(expected, GroupPermissions.CanRename(role));
     }
 
     [Theory]

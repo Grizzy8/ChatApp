@@ -13,7 +13,7 @@ public sealed partial class ChatServerHost
     private static bool IsGroupRequest(MessageType type) => type is
         MessageType.CreateGroup or MessageType.InviteToGroup or MessageType.AcceptInvite or MessageType.DeclineInvite
         or MessageType.GetGroupMembers or MessageType.GroupMessage or MessageType.LeaveGroup or MessageType.RemoveMember
-        or MessageType.PromoteMember or MessageType.DemoteMember or MessageType.DeleteGroup;
+        or MessageType.PromoteMember or MessageType.DemoteMember or MessageType.DeleteGroup or MessageType.RenameGroup;
 
     private async Task HandleGroupRequestAsync(ClientSession session, ChatMessage message, CancellationToken token)
     {
@@ -91,6 +91,21 @@ public sealed partial class ChatServerHost
                 }
 
                 return ToErrorCode(left);
+
+            case MessageType.RenameGroup:
+                if (!GroupNameValidator.TryNormalize(message.Text, out string newName))
+                {
+                    return ErrorCode.GroupNameInvalid;
+                }
+
+                GroupResult renamed = await _groups.RenameAsync(groupId, userId, newName, token).ConfigureAwait(false);
+                if (renamed == GroupResult.Ok)
+                {
+                    WriteLog($"{session.Username} bir grubun adını değiştirdi ({groupId}).");
+                    await NotifyGroupChangedAsync(groupId, [], token).ConfigureAwait(false);
+                }
+
+                return ToErrorCode(renamed);
 
             case MessageType.DeleteGroup:
                 return await DeleteGroupAsync(session, groupId, token).ConfigureAwait(false);

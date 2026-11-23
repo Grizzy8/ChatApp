@@ -90,6 +90,9 @@ public enum MessageType
     /// <summary>İstemci → Sunucu: yöneticiliği al (yalnızca kurucu). Recipient = grup ID, Text = üyenin ID'si.</summary>
     DemoteMember,
 
+    /// <summary>İstemci → Sunucu: grubun adını değiştir (yalnızca kurucu). Recipient = grup ID, Text = yeni ad.</summary>
+    RenameGroup,
+
     /// <summary>İstemci → Sunucu: grubu sil (yalnızca kurucu). Recipient = grup ID.</summary>
     DeleteGroup,
 

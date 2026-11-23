@@ -311,6 +311,29 @@ public sealed class GroupRepository
         }, ct);
     }
 
+    /// <summary>Grubun adını değiştirir. Yalnızca kurucu.</summary>
+    public Task<GroupResult> RenameAsync(string groupId, string actorId, string newName, CancellationToken ct = default)
+    {
+        ArgumentException.ThrowIfNullOrEmpty(newName);
+
+        return WriteAsync(async (connection, tx) =>
+        {
+            GroupRole? role = await RoleOfAsync(connection, tx, groupId, actorId, ct).ConfigureAwait(false);
+            if (role is null)
+            {
+                return GroupResult.GroupNotFound;
+            }
+
+            if (!GroupPermissions.CanRename(role.Value))
+            {
+                return GroupResult.NotAuthorized;
+            }
+
+            await ExecuteAsync(connection, tx, "UPDATE Groups SET Name = $name WHERE Id = $g;", ct, ("$name", newName), ("$g", groupId)).ConfigureAwait(false);
+            return GroupResult.Ok;
+        }, ct);
+    }
+
     /// <summary>Grubu siler; üyelikler ve davetler birlikte silinir. Yalnızca kurucu.</summary>
     public Task<GroupResult> DeleteAsync(string groupId, string actorId, CancellationToken ct = default) =>
         WriteAsync(async (connection, tx) =>

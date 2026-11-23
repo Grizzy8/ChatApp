@@ -199,6 +199,13 @@ public sealed class ChatClientService : IDisposable
     public Task<bool> LeaveGroupAsync(string groupId, CancellationToken cancellationToken = default) =>
         SendGroupRequestAsync(MessageType.LeaveGroup, groupId, null, cancellationToken);
 
+    /// <summary>Grubun adını değiştirir (yalnızca kurucu).</summary>
+    public Task<bool> RenameGroupAsync(string groupId, string newName, CancellationToken cancellationToken = default)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(newName);
+        return SendGroupRequestAsync(MessageType.RenameGroup, groupId, newName.Trim(), cancellationToken);
+    }
+
     public Task<bool> DeleteGroupAsync(string groupId, CancellationToken cancellationToken = default) =>
         SendGroupRequestAsync(MessageType.DeleteGroup, groupId, null, cancellationToken);
 

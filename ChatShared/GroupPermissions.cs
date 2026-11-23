@@ -23,6 +23,9 @@ public static class GroupPermissions
     /// <summary>Üyeyi yönetici yapabilir / yöneticiliğini alabilir: yalnızca kurucu.</summary>
     public static bool CanChangeRoles(GroupRole role) => role == GroupRole.Owner;
 
+    /// <summary>Grubun adını değiştirebilir: yalnızca kurucu.</summary>
+    public static bool CanRename(GroupRole role) => role == GroupRole.Owner;
+
     /// <summary>Grubu silebilir: yalnızca kurucu.</summary>
     public static bool CanDeleteGroup(GroupRole role) => role == GroupRole.Owner;
 
