@@ -27,5 +27,14 @@ public enum ErrorCode
     TooManyAttempts,
 
     /// <summary>Sunucu tarafında beklenmeyen bir sorun (ör. veritabanı) oluştu.</summary>
-    ServerError
+    ServerError,
+
+    /// <summary>Eklenmek istenen kullanıcı adı/ID ile eşleşen bir hesap yok.</summary>
+    ContactNotFound,
+
+    ContactAlreadyExists,
+
+    CannotAddSelf,
+
+    ContactLimitReached
 }

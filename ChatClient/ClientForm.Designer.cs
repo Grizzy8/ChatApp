@@ -42,7 +42,9 @@ namespace ChatClient
             connectButton = new Button();
             disconnectButton = new Button();
             chatBox = new RichTextBox();
-            onlineGroup = new GroupBox();
+            sideTabs = new TabControl();
+            onlineTab = new TabPage();
+            contactsTab = new TabPage();
             onlineListBox = new DeselectableListBox();
             messagePanel = new Panel();
             recipientLabel = new Label();
@@ -52,7 +54,9 @@ namespace ChatClient
             statusStrip = new StatusStrip();
             statusLabel = new ToolStripStatusLabel();
             historyStatusLabel = new ToolStripStatusLabel();
-            onlineGroup.SuspendLayout();
+            sideTabs.SuspendLayout();
+            onlineTab.SuspendLayout();
+            contactsTab.SuspendLayout();
             messagePanel.SuspendLayout();
             connectionPanel.SuspendLayout();
             ((System.ComponentModel.ISupportInitialize)portUpDown).BeginInit();
@@ -183,17 +187,31 @@ namespace ChatClient
             chatBox.TabIndex = 1;
             chatBox.Text = "";
             //
-            // onlineGroup
+            // sideTabs
             //
-            onlineGroup.Controls.Add(onlineListBox);
-            onlineGroup.Dock = DockStyle.Right;
-            onlineGroup.Location = new Point(660, 41);
-            onlineGroup.Name = "onlineGroup";
-            onlineGroup.Padding = new Padding(8, 4, 8, 8);
-            onlineGroup.Size = new Size(180, 396);
-            onlineGroup.TabIndex = 4;
-            onlineGroup.TabStop = false;
-            onlineGroup.Text = "Çevrimiçi (0)";
+            sideTabs.Controls.Add(onlineTab);
+            sideTabs.Controls.Add(contactsTab);
+            sideTabs.Dock = DockStyle.Right;
+            sideTabs.Location = new Point(610, 41);
+            sideTabs.Name = "sideTabs";
+            sideTabs.SelectedIndex = 0;
+            sideTabs.Size = new Size(230, 396);
+            sideTabs.TabIndex = 4;
+            //
+            // onlineTab
+            //
+            onlineTab.Controls.Add(onlineListBox);
+            onlineTab.Name = "onlineTab";
+            onlineTab.Padding = new Padding(6);
+            onlineTab.Text = "Çevrimiçi (0)";
+            onlineTab.UseVisualStyleBackColor = true;
+            //
+            // contactsTab
+            //
+            contactsTab.Name = "contactsTab";
+            contactsTab.Padding = new Padding(6);
+            contactsTab.Text = "Kişilerim (0)";
+            contactsTab.UseVisualStyleBackColor = true;
             //
             // onlineListBox
             //
@@ -288,14 +306,16 @@ namespace ChatClient
             AutoScaleMode = AutoScaleMode.Font;
             ClientSize = new Size(1000, 503);
             Controls.Add(chatBox);
-            Controls.Add(onlineGroup);
+            Controls.Add(sideTabs);
             Controls.Add(messagePanel);
             Controls.Add(connectionPanel);
             Controls.Add(statusStrip);
             MinimumSize = new Size(560, 360);
             Name = "ClientForm";
             Text = "ChatApp İstemci";
-            onlineGroup.ResumeLayout(false);
+            onlineTab.ResumeLayout(false);
+            contactsTab.ResumeLayout(false);
+            sideTabs.ResumeLayout(false);
             messagePanel.ResumeLayout(false);
             messagePanel.PerformLayout();
             connectionPanel.ResumeLayout(false);
@@ -321,7 +341,9 @@ namespace ChatClient
         private Button registerButton;
         private Button disconnectButton;
         private RichTextBox chatBox;
-        private GroupBox onlineGroup;
+        private TabControl sideTabs;
+        private TabPage onlineTab;
+        private TabPage contactsTab;
         private DeselectableListBox onlineListBox;
         private Panel messagePanel;
         private Label recipientLabel;

@@ -12,6 +12,7 @@ namespace ChatClient
         public ClientForm()
         {
             InitializeComponent();
+            InitializeContactsTab();
 
             // Windows Forms, form oluşturulurken UI thread'ine ait bir SynchronizationContext kurar;
             // servis event'lerini bu context ile UI thread'inde tetikler.
@@ -224,6 +225,9 @@ namespace ChatClient
                     _chatView.AppendChat(chatTime, chatSender, chatText, isOwn);
                     _ = SaveToHistoryAsync(chatTime, ChatHistoryStore.FormatChat(chatTime, chatSender, chatText));
                     break;
+                case MessageType.ContactList:
+                    SetContacts(message.Contacts);
+                    break;
                 case MessageType.Error:
                     _chatView.AppendError(ErrorMessages.Describe(message.ErrorCode));
                     break;
@@ -276,7 +280,11 @@ namespace ChatClient
             return -1;
         }
 
-        private void UpdateOnlineCount() => onlineGroup.Text = $"Çevrimiçi ({onlineListBox.Items.Count})";
+        private void UpdateOnlineCount()
+        {
+            onlineTab.Text = $"Çevrimiçi ({onlineListBox.Items.Count})";
+            RefreshContactsList(); // kişilerin çevrimiçi durumu bu listeye bağlıdır
+        }
 
         private void OnDisconnected(object? sender, DisconnectInfo info)
         {
@@ -286,6 +294,7 @@ namespace ChatClient
             }
 
             SetOnlineUsers(Array.Empty<string>());
+            ClearContacts();
             _history = null;
 
             if (info.Reason == DisconnectReason.UserRequested)
@@ -323,6 +332,7 @@ namespace ChatClient
             passwordTextBox.Enabled = isDisconnected;
             connectButton.Enabled = isDisconnected;
             registerButton.Enabled = isDisconnected;
+            UpdateContactsUi(state == ConnectionState.Connected);
             bool isConnected = state == ConnectionState.Connected;
             disconnectButton.Enabled = isConnected;
             messageTextBox.Enabled = isConnected;

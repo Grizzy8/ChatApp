@@ -84,6 +84,19 @@ public class MessageSerializerTests
     }
 
     [Fact]
+    public void RoundTrip_PreservesContactList()
+    {
+        var original = new ChatMessage(
+            MessageType.ContactList,
+            Contacts: new[] { new ContactInfo("K7M2-9QXD", "Ayşe"), new ContactInfo("AAAA-2222", "veli") });
+
+        var result = MessageSerializer.Deserialize(MessageSerializer.Serialize(original));
+
+        Assert.NotNull(result);
+        Assert.Equal(original.Contacts, result.Contacts);
+    }
+
+    [Fact]
     public void ToString_NeverRevealsThePassword()
     {
         var message = new ChatMessage(MessageType.Login, Sender: "ali", Password: "çok-gizli-parola");

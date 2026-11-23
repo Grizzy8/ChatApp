@@ -151,6 +151,23 @@ public sealed class ChatClientService : IDisposable
         return SendMessageAsync(new ChatMessage(MessageType.Private, Recipient: recipient, Text: text), cancellationToken);
     }
 
+    /// <summary>
+    /// Kullanıcı adı ya da ID ile kişi ekletir. Sonuç, sunucudan gelen ContactList (başarı) veya Error (hata)
+    /// mesajıyla MessageReceived olayında iletilir. Dönüş değeri SendChatAsync ile aynı anlamdadır.
+    /// </summary>
+    public Task<bool> AddContactAsync(string usernameOrId, CancellationToken cancellationToken = default)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(usernameOrId);
+        return SendMessageAsync(new ChatMessage(MessageType.AddContact, Text: usernameOrId.Trim()), cancellationToken);
+    }
+
+    /// <summary>Kişiyi kimliğiyle sildirir. Sonuç AddContactAsync gibi ContactList/Error olarak iletilir.</summary>
+    public Task<bool> RemoveContactAsync(string userId, CancellationToken cancellationToken = default)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(userId);
+        return SendMessageAsync(new ChatMessage(MessageType.RemoveContact, Text: userId), cancellationToken);
+    }
+
     private async Task<bool> SendMessageAsync(ChatMessage message, CancellationToken cancellationToken)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(message.Text);

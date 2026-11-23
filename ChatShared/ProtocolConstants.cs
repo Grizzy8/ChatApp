@@ -22,6 +22,12 @@ public static class ProtocolConstants
 
     public static readonly TimeSpan AuthAttemptWindow = TimeSpan.FromMinutes(1);
 
+    /// <summary>Bir kullanıcının kişi listesinde tutabileceği en fazla kişi.</summary>
+    public const int MaxContacts = 200;
+
+    /// <summary>Kişi eklerken yazılan kullanıcı adı/ID metninin en fazla uzunluğu.</summary>
+    public const int MaxContactQueryLength = 40;
+
     /// <summary>Tek bir sohbet mesajının en fazla karakter sayısı.</summary>
     public const int MaxMessageLength = 500;
 

@@ -71,6 +71,30 @@ public sealed class UserRepository
             ? FindAsync("Id = $id", "$id", normalized, cancellationToken)
             : Task.FromResult<UserRecord?>(null);
 
+    /// <summary>
+    /// Kişi eklerken yazılan metinden hesabı bulur. İçinde '-' olan metin kimlik (ID) sayılır (kullanıcı adında tire olamaz);
+    /// diğerleri önce kullanıcı adı, bulunamazsa tiresiz yazılmış kimlik olarak denenir.
+    /// </summary>
+    public async Task<UserRecord?> FindByUsernameOrIdAsync(string? query, CancellationToken cancellationToken = default)
+    {
+        string text = query?.Trim() ?? string.Empty;
+        if (text.Length == 0 || text.Length > ProtocolConstants.MaxContactQueryLength)
+        {
+            return null;
+        }
+
+        if (text.Contains('-'))
+        {
+            return await FindByIdAsync(text, cancellationToken).ConfigureAwait(false);
+        }
+
+        UserRecord? byName = UsernameValidator.IsValid(text)
+            ? await FindByUsernameAsync(text, cancellationToken).ConfigureAwait(false)
+            : null;
+
+        return byName ?? await FindByIdAsync(text, cancellationToken).ConfigureAwait(false);
+    }
+
     private async Task<UserRecord?> FindAsync(string where, string parameterName, string value, CancellationToken cancellationToken)
     {
         await using SqliteConnection connection = await _database.OpenAsync(cancellationToken).ConfigureAwait(false);

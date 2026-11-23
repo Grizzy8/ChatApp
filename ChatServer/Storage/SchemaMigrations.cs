@@ -19,6 +19,18 @@ internal static class SchemaMigrations
             PasswordHash TEXT NOT NULL,
             CreatedAt    TEXT NOT NULL
         ) STRICT;
+        """,
+
+        // v2: kişi defteri. Tek yönlüdür: A, B'yi eklerse yalnızca A'nın listesinde B olur.
+        // Hesap silinirse ona ait kişi kayıtları da silinir; kendini eklemek veritabanı düzeyinde de yasaktır.
+        """
+        CREATE TABLE Contacts (
+            OwnerId   TEXT NOT NULL REFERENCES Users(Id) ON DELETE CASCADE,
+            ContactId TEXT NOT NULL REFERENCES Users(Id) ON DELETE CASCADE,
+            AddedAt   TEXT NOT NULL,
+            PRIMARY KEY (OwnerId, ContactId),
+            CHECK (OwnerId <> ContactId)
+        ) STRICT;
         """
     ];
 

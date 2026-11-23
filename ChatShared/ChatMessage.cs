@@ -16,6 +16,7 @@ namespace ChatShared;
 /// <param name="ErrorCode">Hata kodu (JoinRejected, Error).</param>
 /// <param name="Password">Parola (yalnızca Register/Login isteğinde). ToString'e ve log'a asla yazılmaz.</param>
 /// <param name="UserId">Hesabın benzersiz kimliği (JoinAccepted).</param>
+/// <param name="Contacts">Kişi listesi (ContactList).</param>
 public sealed record ChatMessage(
     [property: JsonRequired] MessageType Type,
     string? Sender = null,
@@ -25,7 +26,8 @@ public sealed record ChatMessage(
     IReadOnlyList<string>? Users = null,
     ErrorCode? ErrorCode = null,
     string? Password = null,
-    string? UserId = null)
+    string? UserId = null,
+    IReadOnlyList<ContactInfo>? Contacts = null)
 {
     // Record'un otomatik ToString'i tüm alanları yazar; bir hata ayıklama çıktısı ya da log satırı
     // parolayı ifşa etmesin diye Password bu çıktıdan çıkarılır.

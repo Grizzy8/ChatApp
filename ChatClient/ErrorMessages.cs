@@ -24,6 +24,10 @@ public static class ErrorMessages
         ErrorCode.AccountAlreadyOnline => "Bu hesap şu anda başka bir yerde açık.",
         ErrorCode.TooManyAttempts => "Çok fazla deneme yaptınız. Lütfen bir dakika bekleyip tekrar deneyin.",
         ErrorCode.ServerError => "Sunucuda beklenmeyen bir sorun oluştu. Lütfen daha sonra tekrar deneyin.",
+        ErrorCode.ContactNotFound => "Bu kullanıcı adı ya da ID ile bir hesap bulunamadı.",
+        ErrorCode.ContactAlreadyExists => "Bu kişi zaten kişilerinizde.",
+        ErrorCode.CannotAddSelf => "Kendinizi kişi olarak ekleyemezsiniz.",
+        ErrorCode.ContactLimitReached => $"En fazla {ProtocolConstants.MaxContacts} kişi ekleyebilirsiniz.",
         ErrorCode.RateLimited =>
             $"Çok hızlı mesaj gönderiyorsunuz. {ProtocolConstants.RateLimitWindow.TotalSeconds:0} saniyede en fazla " +
             $"{ProtocolConstants.MaxMessagesPerWindow} mesaj gönderebilirsiniz.",

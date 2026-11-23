@@ -15,6 +15,15 @@ public enum MessageType
     /// </summary>
     JoinAccepted,
 
+    /// <summary>İstemci → Sunucu: kişi ekleme isteği. Text = kullanıcı adı ya da kimlik (ID).</summary>
+    AddContact,
+
+    /// <summary>İstemci → Sunucu: kişiyi silme isteği. Text = kişinin kimliği (ID).</summary>
+    RemoveContact,
+
+    /// <summary>Sunucu → İstemci: kişi listesinin tamamı (Contacts). Girişte ve her değişiklikten sonra gönderilir.</summary>
+    ContactList,
+
     /// <summary>Sunucu → İstemci: kayıt/giriş reddedildi, ErrorCode ekli.</summary>
     JoinRejected,
 

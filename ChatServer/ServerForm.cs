@@ -17,7 +17,8 @@ namespace ChatServer
         public ServerForm()
         {
             InitializeComponent();
-            _host = new ChatServerHost(new UserRepository(_database));
+            var users = new UserRepository(_database);
+            _host = new ChatServerHost(users, new ContactRepository(_database, users));
 
             portUpDown.Minimum = ProtocolConstants.MinPort;
             portUpDown.Maximum = ProtocolConstants.MaxPort;
