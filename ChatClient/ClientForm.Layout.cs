@@ -36,8 +36,9 @@ namespace ChatClient
         private readonly ThemedListBox contactsList = new() { Dock = DockStyle.Fill, RowHeight = ContactRowHeight };
         private readonly Label contactsEmptyLabel = new() { Text = "Kişi yok. Yukarıdan kullanıcı adı ya da ID ile arayıp ekleyebilirsiniz.", Dock = DockStyle.Fill, ForeColor = Theme.Muted, Padding = new Padding(14, 8, 14, 0) };
         private readonly Panel profileStrip = new() { Dock = DockStyle.Bottom, Height = 60, BackColor = Theme.Darkest };
-        private readonly Label profileNameLabel = new() { AutoSize = true, Font = new Font("Segoe UI", 10f, FontStyle.Bold), ForeColor = Color.White };
-        private readonly Label profileIdLabel = new() { AutoSize = true, ForeColor = Theme.Muted, Font = new Font("Segoe UI", 8.5f) };
+        // Sabit boyutlu ve AutoEllipsis'li: uzun ad ya da geniş harfli ID alt satıra taşıp kırpılmaz, "..." ile kısalır.
+        private readonly Label profileNameLabel = new() { AutoSize = false, AutoEllipsis = true, Dock = DockStyle.Fill, TextAlign = ContentAlignment.BottomLeft, Margin = Padding.Empty, Font = new Font("Segoe UI", 10f, FontStyle.Bold), ForeColor = Color.White };
+        private readonly Label profileIdLabel = new() { AutoSize = false, AutoEllipsis = true, Dock = DockStyle.Fill, TextAlign = ContentAlignment.TopLeft, Margin = Padding.Empty, ForeColor = Theme.Muted, Font = new Font("Segoe UI", 8.5f) };
         private readonly Button copyIdButton = new() { Text = "ID kopyala", AutoSize = true, Height = 28 };
         private readonly Button disconnectButton = new() { Text = "Çıkış", AutoSize = true, Height = 28 };
 
@@ -151,9 +152,12 @@ namespace ChatClient
             profileLayout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
             profileLayout.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 74));
             profileLayout.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 60));
-            var profileText = new FlowLayoutPanel { Dock = DockStyle.Fill, FlowDirection = FlowDirection.TopDown, WrapContents = false, Padding = new Padding(0, 10, 0, 0), BackColor = Color.Transparent };
-            profileText.Controls.Add(profileNameLabel);
-            profileText.Controls.Add(profileIdLabel);
+            var profileText = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 1, RowCount = 2, Padding = new Padding(0, 8, 0, 4), BackColor = Color.Transparent };
+            profileText.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
+            profileText.RowStyles.Add(new RowStyle(SizeType.Percent, 50));
+            profileText.RowStyles.Add(new RowStyle(SizeType.Percent, 50));
+            profileText.Controls.Add(profileNameLabel, 0, 0);
+            profileText.Controls.Add(profileIdLabel, 0, 1);
             profileLayout.Controls.Add(profileText, 1, 0);
             profileLayout.Controls.Add(copyIdButton, 2, 0);
             profileLayout.Controls.Add(disconnectButton, 3, 0);
