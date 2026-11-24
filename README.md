@@ -63,6 +63,33 @@ Testler protokol, doğrulayıcılar, parola hash'i ve diğer saf mantığı kaps
 - Grup ayarları için grup adına sağ tıklayın ya da başlıktaki **Ayarlar**'ı kullanın.
 - Parola unutulursa sıfırlama yoktur.
 
+## Kullanılan teknolojiler
+
+| Alan | Teknoloji |
+|---|---|
+| Dil ve platform | C# (nullable açık), **.NET 10** (`net10.0` / `net10.0-windows`) |
+| Arayüz | **Windows Forms**: kod ile kurulan arayüz, `RichTextBox` mesaj görünümü, sahip-çizimli (`OwnerDraw`) listeler, PerMonitorV2 DPI |
+| Ağ | `System.Net.Sockets` (`TcpListener` / `TcpClient`): düz TCP üzerinde satır tabanlı JSON protokolü |
+| Serileştirme | `System.Text.Json` |
+| Eşzamanlılık | `async`/`await`, `CancellationToken`, `System.Collections.Concurrent` |
+| Parola ve kimlik | `System.Security.Cryptography`: PBKDF2-SHA256 (`Rfc2898DeriveBytes`), rastgele tuz, sabit zamanlı karşılaştırma; ID üretiminde kriptografik rastgele sayı |
+| Sunucu verisi | **SQLite** (`STRICT` tablolar, WAL kipi, `user_version` ile şema göçleri) |
+| İstemci geçmişi | Sohbet başına JSON Lines (`.jsonl`) dosyası + okunma zamanı için `state.json` |
+| Pencere teması | Win32 `DwmSetWindowAttribute` (koyu başlık çubuğu) |
+| Test | **xUnit** |
+
+### NuGet paketleri
+
+| Proje | Paket | Sürüm | Amaç |
+|---|---|---|---|
+| `ChatServer` | `Microsoft.Data.Sqlite` | 11.0.0 | SQLite erişimi (ADO.NET) |
+| `ChatShared.Test` | `xunit` | 2.9.3 | Birim test çatısı |
+| `ChatShared.Test` | `xunit.runner.visualstudio` | 3.1.4 | Visual Studio / `dotnet test` çalıştırıcısı |
+| `ChatShared.Test` | `Microsoft.NET.Test.Sdk` | 17.14.1 | Test ana bilgisayarı |
+| `ChatShared.Test` | `coverlet.collector` | 6.0.4 | Kod kapsamı ölçümü |
+
+`Microsoft.Data.Sqlite` yerel SQLite kütüphanesini `SQLitePCLRaw.bundle_e_sqlite3` aracılığıyla getirir (ek kurulum gerekmez). `ChatShared` ve `ChatClient` hiçbir harici NuGet paketi kullanmaz; yalnızca .NET'in kendi kitaplıkları kullanılır.
+
 ## Proje yapısı
 
 | Klasör | İçerik |
