@@ -12,6 +12,12 @@ Ders ödevi olarak geliştirilmiştir. Gizlilik esastır: sunucu arayüzü ve g�
 |---|---|
 | ![Grup](docs/ekran-goruntuleri/grup-uyeler.png) | ![Grup ayarları](docs/ekran-goruntuleri/grup-ayarlari.png) |
 
+| Kullanıcı arama |
+|---|
+| ![Arama](docs/ekran-goruntuleri/arama.png) |
+
+Arama kutusuna yazılan tam kullanıcı adı ya da ID, kişi olmayan hesapları da "Diğer kullanıcılar" altında bulur; sonuca tıklayıp onaylayınca kişilere eklenir.
+
 ## Hızlı başlangıç
 
 **Gereksinimler:**
@@ -98,7 +104,11 @@ Testler protokol, doğrulayıcılar, parola hash'i ve diğer saf mantığı kaps
 | `ChatServer` | Sunucu çekirdeği (oturumlar, yönlendirme, SQLite depolama) ve WinForms izleme penceresi |
 | `ChatClient` | WinForms istemci |
 | `ChatShared.Test` | xUnit birim testleri |
-| `docs` | Elle test listesi, ekran görüntüleri |
+| `docs` | Mimari diyagramlar, elle test listesi, ekran görüntüleri |
+
+### Mimari
+
+İstemci-sunucu modeli: sunucu TCP üzerinde satır tabanlı JSON mesajlarını dinler, kimlik doğrular, mesajları yönlendirir ve çevrimdışı alıcılar için SQLite'taki `PendingMessages` tablosunda bekletir. Kayıt/giriş el sıkışması (zamanlama saldırısı korumasıyla), özel mesaj teslimatı ve grup mesaj yayını için Mermaid sıra diyagramları [docs/mimari.md](docs/mimari.md) dosyasındadır.
 
 ## Bilinen sınırlamalar
 
