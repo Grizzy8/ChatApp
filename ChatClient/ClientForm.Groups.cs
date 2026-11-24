@@ -136,7 +136,7 @@ namespace ChatClient
                 var created = new Conversation(key, ConversationKind.Group, group.Name, group.Id)
                 {
                     // Girişteki ilk listede mesajsız gruplar altta kalır; oturum sırasında katılınan grup en üste çıkar.
-                    LastActivity = stored?.LastTime ?? (isFirstList ? DateTime.MinValue : DateTime.Now),
+                    LastActivity = stored?.LastTime ?? (isFirstList ? DateTime.MinValue : DateTime.UtcNow),
                     Unread = stored?.Unread ?? 0
                 };
                 _conversations[key] = created;

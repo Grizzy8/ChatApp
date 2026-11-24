@@ -29,6 +29,22 @@ public class MessageSerializerTests
     }
 
     [Fact]
+    public void RoundTrip_UtcTimestamp_StaysUtcAndKeepsInstant()
+    {
+        var utc = new DateTime(2026, 11, 23, 23, 30, 0, DateTimeKind.Utc);
+        var original = new ChatMessage(MessageType.Private, Sender: "ali", Timestamp: utc);
+
+        string json = MessageSerializer.Serialize(original);
+        var result = MessageSerializer.Deserialize(json);
+
+        Assert.Contains("Z", json); // UTC işareti hat üzerinde korunur
+        Assert.NotNull(result?.Timestamp);
+        Assert.Equal(DateTimeKind.Utc, result.Timestamp.Value.Kind);
+        Assert.Equal(utc, result.Timestamp.Value);
+        Assert.Equal(utc.ToLocalTime(), result.Timestamp.Value.ToLocalTime()); // yerel saate çeviri aynı ana işaret eder
+    }
+
+    [Fact]
     public void RoundTrip_PrivateQueuedAndInboxFullError()
     {
         var queued = new ChatMessage(MessageType.PrivateQueued, Sender: "Ali", Recipient: "Bea", Text: "selam");

@@ -54,7 +54,7 @@ public sealed partial class ChatServerHost
         }
 
         var delivery = new ChatMessage(
-            MessageType.Private, Sender: session.Username, Recipient: target.Username, Text: text, Timestamp: DateTime.Now);
+            MessageType.Private, Sender: session.Username, Recipient: target.Username, Text: text, Timestamp: DateTime.UtcNow);
 
         if (_registry.TryGetActive(target.Username, out ClientSession? targetSession)
             && await _router.SendToAsync(targetSession, delivery, token).ConfigureAwait(false))
@@ -97,7 +97,7 @@ public sealed partial class ChatServerHost
                     Sender: item.SenderUsername,
                     Recipient: item.GroupId ?? session.Username,
                     Text: item.Text,
-                    Timestamp: item.SentAtUtc.ToLocalTime());
+                    Timestamp: item.SentAtUtc);
 
                 if (!await _router.SendToAsync(session, message, token).ConfigureAwait(false))
                 {

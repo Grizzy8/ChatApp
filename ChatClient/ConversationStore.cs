@@ -136,7 +136,7 @@ public sealed class ConversationStore
         _writeLock.Wait();
         try
         {
-            _lastRead[key] = time;
+            _lastRead[key] = time.ToUniversalTime();
             Directory.CreateDirectory(_userDirectory);
             File.WriteAllText(_statePath, JsonSerializer.Serialize(_lastRead.ToDictionary(p => p.Key, p => p.Value)), Utf8NoBom);
         }
@@ -170,7 +170,7 @@ public sealed class ConversationStore
                 {
                     if (ConversationKey.IsValid(key))
                     {
-                        _lastRead[key] = time;
+                        _lastRead[key] = time.ToUniversalTime();
                     }
                 }
             }
@@ -202,7 +202,8 @@ public sealed class ConversationStore
 
             if (message is { Sender: not null, Text: not null })
             {
-                yield return message;
+                // Eski kayıtlar yerel saatle yazılmış olabilir; hepsi UTC'ye çevrilerek karşılaştırmalar tutarlı kalır.
+                yield return message with { Time = message.Time.ToUniversalTime() };
             }
         }
     }

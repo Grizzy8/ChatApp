@@ -68,13 +68,17 @@ public sealed class MessageView
     /// </summary>
     public void AppendMessage(ChatEntry entry, ChatEntry? previous, bool showSender)
     {
-        if (previous is null || previous.Time.Date != entry.Time.Date)
+        // Mesaj zamanları UTC tutulur; gün ayracı ve saat kullanıcının yerel saatine göre gösterilir.
+        DateTime entryLocal = entry.Time.ToLocalTime();
+        DateTime? previousLocal = previous?.Time.ToLocalTime();
+
+        if (previousLocal is null || previousLocal.Value.Date != entryLocal.Date)
         {
-            AppendCentered(entry.Time.ToString("d MMMM yyyy", Turkish), Theme.Muted);
+            AppendCentered(entryLocal.ToString("d MMMM yyyy", Turkish), Theme.Muted);
         }
 
         bool sameRun = previous is not null
-            && previous.Time.Date == entry.Time.Date
+            && previousLocal!.Value.Date == entryLocal.Date
             && string.Equals(previous.Sender, entry.Sender, StringComparison.OrdinalIgnoreCase)
             && (entry.Time - previous.Time).TotalMinutes < SameSenderGapMinutes;
 
@@ -92,7 +96,7 @@ public sealed class MessageView
                 AppendRun("  ", Theme.Muted, _small);
             }
 
-            AppendRun(entry.Time.ToString("HH:mm", Turkish), Theme.Muted, _small);
+            AppendRun(entryLocal.ToString("HH:mm", Turkish), Theme.Muted, _small);
             EndParagraph(start, align, indent, rightIndent);
         }
 

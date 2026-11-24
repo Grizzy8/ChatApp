@@ -373,13 +373,13 @@ public sealed partial class ChatServerHost : IDisposable
                 await session.SendAsync(
                     new ChatMessage(
                         MessageType.JoinAccepted, Sender: user.Username, UserId: user.Id,
-                        Timestamp: DateTime.Now, Users: visibleOnline),
+                        Timestamp: DateTime.UtcNow, Users: visibleOnline),
                     sendCts.Token).ConfigureAwait(false);
             }
 
             session.MarkActive();
 
-            var joined = new ChatMessage(MessageType.UserJoined, Sender: user.Username, Timestamp: DateTime.Now);
+            var joined = new ChatMessage(MessageType.UserJoined, Sender: user.Username, Timestamp: DateTime.UtcNow);
             await NotifyWatchersAsync(user.Id, joined, token).ConfigureAwait(false);
             return ErrorCode.None;
         }
@@ -410,7 +410,7 @@ public sealed partial class ChatServerHost : IDisposable
                 return; // Hiç duyurulmamış bir katılım ya da sunucunun kapanışı: bildirilecek kimse yok.
             }
 
-            var left = new ChatMessage(MessageType.UserLeft, Sender: session.Username, Timestamp: DateTime.Now);
+            var left = new ChatMessage(MessageType.UserLeft, Sender: session.Username, Timestamp: DateTime.UtcNow);
             await NotifyWatchersAsync(session.UserId!, left, token).ConfigureAwait(false);
         }
         catch (OperationCanceledException) when (token.IsCancellationRequested)

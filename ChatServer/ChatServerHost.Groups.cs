@@ -244,7 +244,7 @@ public sealed partial class ChatServerHost
 
         WriteLog($"{session.UserId} → grup {groupId}: [grup mesajı]");
 
-        var delivery = new ChatMessage(MessageType.GroupMessage, Sender: session.Username, Recipient: groupId, Text: text, Timestamp: DateTime.Now);
+        var delivery = new ChatMessage(MessageType.GroupMessage, Sender: session.Username, Recipient: groupId, Text: text, Timestamp: DateTime.UtcNow);
         var offlineIds = new List<string>();
         foreach (GroupMemberRecord member in members)
         {

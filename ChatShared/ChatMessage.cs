@@ -11,7 +11,7 @@ namespace ChatShared;
 /// <param name="Sender">Gönderen kullanıcı adı.</param>
 /// <param name="Recipient">Özel mesajın alıcısı.</param>
 /// <param name="Text">Mesaj metni.</param>
-/// <param name="Timestamp">Sunucunun atadığı zaman damgası.</param>
+/// <param name="Timestamp">Sunucunun atadığı zaman damgası (UTC). İstemci göstermeden önce yerel saate çevirir.</param>
 /// <param name="Users">Çevrimiçi kullanıcı listesi (JoinAccepted).</param>
 /// <param name="ErrorCode">Hata kodu (JoinRejected, Error).</param>
 /// <param name="Password">Parola (yalnızca Register/Login isteğinde). ToString'e ve log'a asla yazılmaz.</param>

@@ -455,7 +455,7 @@ namespace ChatClient
             }
 
             Conversation conversation = GetOrCreatePrivate(peer);
-            AddMessage(conversation, message.Timestamp ?? DateTime.Now, message.Sender ?? "?", message.Text ?? string.Empty);
+            AddMessage(conversation, message.Timestamp ?? DateTime.UtcNow, message.Sender ?? "?", message.Text ?? string.Empty);
 
             if (message.Type == MessageType.PrivateQueued && _current == conversation)
             {
@@ -469,13 +469,14 @@ namespace ChatClient
             if (message.Recipient is { } groupId
                 && _conversations.TryGetValue(ConversationKey.ForGroup(groupId), out Conversation? conversation))
             {
-                AddMessage(conversation, message.Timestamp ?? DateTime.Now, message.Sender ?? "?", message.Text ?? string.Empty);
+                AddMessage(conversation, message.Timestamp ?? DateTime.UtcNow, message.Sender ?? "?", message.Text ?? string.Empty);
             }
         }
 
         private void AddMessage(Conversation conversation, DateTime time, string sender, string text)
         {
             EnsureLoaded(conversation); // dosyaya yazmadan önce okunur; böylece mesaj iki kez görünmez
+            time = time.ToUniversalTime(); // bellekte ve diskte her zaman UTC; yerel saate yalnızca gösterirken çevrilir
             var entry = new ChatEntry(time, sender, text, IsMe(sender));
             List<ChatEntry> messages = conversation.Messages!;
             ChatEntry? previous = messages.Count > 0 ? messages[^1] : null;
@@ -515,7 +516,8 @@ namespace ChatClient
         {
             conversation.Unread = 0;
             DateTime lastMessage = conversation.Messages is { Count: > 0 } messages ? messages[^1].Time : DateTime.MinValue;
-            DateTime readUpTo = lastMessage > DateTime.Now ? lastMessage : DateTime.Now; // sunucu saati ileride olabilir
+            DateTime now = DateTime.UtcNow;
+            DateTime readUpTo = lastMessage > now ? lastMessage : now; // sunucu saati ileride olabilir
 
             try
             {
